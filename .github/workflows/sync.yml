@@ -1,0 +1,52 @@
+name: Sync edid-decode from v4l-utils
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 5 * * *'
+
+permissions:
+  contents: write
+
+jobs:
+  sync:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout local repository
+        uses: actions/checkout@v4
+
+      - name: Clone v4l-utils repository
+        run: git clone --depth 1 https://git.linuxtv.org/v4l-utils.git v4l-utils-temp
+
+      - name: Ensure target directory exists
+        run: New-Item -ItemType Directory -Force -Path .\src
+
+      - name: Sync the edid-decode directory
+        run: |
+          robocopy .\v4l-utils-temp\utils\edid-decode .\src /mir
+          if ($LASTEXITCODE -ge 8) {
+            Write-Error "Robocopy failed: $LASTEXITCODE."
+            exit $LASTEXITCODE
+          } else {
+            Write-Host "Robocopy completed: $LASTEXITCODE."
+            exit 0
+          }
+
+      - name: Configure Git
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Commit and push if changes exist
+        shell: pwsh
+        run: |
+          if (-not (git status --porcelain)) {
+            echo "No changes detected. Skipping commit."
+            exit 0
+          }
+          
+          echo "Changes detected. Committing and pushing..."
+          git add src
+          git commit -m "Sync: Update edid-decode from v4l-utils repository"
+          git push

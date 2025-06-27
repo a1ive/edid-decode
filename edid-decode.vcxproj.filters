@@ -66,8 +66,12 @@
     <ClInclude Include="src\oui.h">
       <Filter>edid-decode</Filter>
     </ClInclude>
+    <ClInclude Include="shim.h">
+      <Filter>windows-unix</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="Directory.Build.props" />
+    <None Include="packages.config" />
   </ItemGroup>
 </Project>

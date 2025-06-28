@@ -21,3 +21,9 @@ If you have the EDID data saved as a binary file (e.g., `edid.bin``), you can pa
 ```
 edid-decode.exe path\to\edid.bin
 ```
+
+### Save the EDID binary to a File
+
+```
+edid-decode.exe /MONITOR0 edid.bin
+```

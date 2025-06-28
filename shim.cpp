@@ -100,3 +100,20 @@ extern "C" int open(const char* pathname, int flags, ...)
 	}
 	return _open(pathname, flags, pmode);
 }
+
+extern "C" FILE* fopen(const char* filename, const char* mode)
+{
+	// Check if the mode is exactly "w" (write, text mode).
+	if (mode != nullptr && strcmp(mode, "w") == 0)
+	{
+		// We change the mode to "wb" (write, binary mode) and call
+		// _fsopen, which is the underlying Microsoft-specific function that
+		// fopen often wraps. This avoids an infinite recursive call to ourself.
+		// _SH_DENYNO is the default sharing mode used by fopen.
+		return _fsopen(filename, "wb", _SH_DENYNO);
+	}
+
+	// For all other modes ("r", "rb", "a", "wb", etc.), we pass them through
+	// to the underlying function without modification.
+	return _fsopen(filename, mode, _SH_DENYNO);
+}

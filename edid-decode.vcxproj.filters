@@ -52,6 +52,9 @@
     <ClCompile Include="src\parse-eld.cpp">
       <Filter>edid-decode</Filter>
     </ClCompile>
+    <ClCompile Include="winedid.c">
+      <Filter>windows-unix</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\edid-decode.h">
@@ -67,6 +70,9 @@
       <Filter>edid-decode</Filter>
     </ClInclude>
     <ClInclude Include="shim.h">
+      <Filter>windows-unix</Filter>
+    </ClInclude>
+    <ClInclude Include="winedid.h">
       <Filter>windows-unix</Filter>
     </ClInclude>
   </ItemGroup>

@@ -33,7 +33,7 @@
     <UseDebugLibraries>true</UseDebugLibraries>
     <PlatformToolset>v143</PlatformToolset>
     <CharacterSet>Unicode</CharacterSet>
-    <SupportLTL>true</SupportLTL>
+    <SupportLTL>msvcrt</SupportLTL>
     <WindowsTargetPlatformMinVersion>5.1.2600.0</WindowsTargetPlatformMinVersion>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
@@ -41,7 +41,7 @@
     <UseDebugLibraries>true</UseDebugLibraries>
     <PlatformToolset>v143</PlatformToolset>
     <CharacterSet>Unicode</CharacterSet>
-    <SupportLTL>true</SupportLTL>
+    <SupportLTL>msvcrt</SupportLTL>
     <WindowsTargetPlatformMinVersion>5.1.2600.0</WindowsTargetPlatformMinVersion>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
@@ -50,7 +50,7 @@
     <PlatformToolset>v143</PlatformToolset>
     <WholeProgramOptimization>true</WholeProgramOptimization>
     <CharacterSet>Unicode</CharacterSet>
-    <SupportLTL>true</SupportLTL>
+    <SupportLTL>msvcrt</SupportLTL>
     <WindowsTargetPlatformMinVersion>5.1.2600.0</WindowsTargetPlatformMinVersion>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="Configuration">
@@ -59,7 +59,7 @@
     <PlatformToolset>v143</PlatformToolset>
     <WholeProgramOptimization>true</WholeProgramOptimization>
     <CharacterSet>Unicode</CharacterSet>
-    <SupportLTL>true</SupportLTL>
+    <SupportLTL>msvcrt</SupportLTL>
     <WindowsTargetPlatformMinVersion>5.1.2600.0</WindowsTargetPlatformMinVersion>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
@@ -110,6 +110,7 @@
       <DisableSpecificWarnings>4244; 4018; 4267; 4996; 26451; 6385; 6001</DisableSpecificWarnings>
       <AdditionalOptions>/utf-8</AdditionalOptions>
       <ForcedIncludeFiles>$(SolutionDir)shim.h;%(ForcedIncludeFiles)</ForcedIncludeFiles>
+      <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -136,6 +137,7 @@
       <DisableSpecificWarnings>4244; 4018; 4267; 4996; 26451; 6385; 6001</DisableSpecificWarnings>
       <AdditionalOptions>/utf-8</AdditionalOptions>
       <ForcedIncludeFiles>$(SolutionDir)shim.h;%(ForcedIncludeFiles)</ForcedIncludeFiles>
+      <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -211,6 +213,7 @@
     <ClCompile Include="src\parse-ls-ext-block.cpp" />
     <ClCompile Include="src\parse-vtb-ext-block.cpp" />
     <ClCompile Include="src\vs\getsubopt.c" />
+    <ClCompile Include="winedid.c" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="shim.h" />
@@ -218,6 +221,7 @@
     <ClInclude Include="src\vs\getopt.h" />
     <ClInclude Include="src\vs\unistd.h" />
     <ClInclude Include="src\edid-decode.h" />
+    <ClInclude Include="winedid.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="Directory.Build.props" />

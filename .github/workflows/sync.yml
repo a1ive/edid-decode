@@ -14,7 +14,7 @@ jobs:
 
     steps:
       - name: Checkout local repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Clone v4l-utils repository
         run: git clone --depth 1 https://git.linuxtv.org/v4l-utils.git v4l-utils-temp

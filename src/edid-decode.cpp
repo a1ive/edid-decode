@@ -226,7 +226,7 @@ static void usage(void)
 	       "  --list-hdmi-vics      List all known HDMI VICs.\n"
 	       "  --list-rids           List all known RIDs.\n"
 	       "  --list-rid-timings <rid> List all timings for RID <rid> or all known RIDs if <rid> is 0.\n"
-	       "  -I, --infoframe <file> Parse the InfoFrame from <file> that was sent to this display.\n"
+	       "  -I, --infoframe <file> Parse the InfoFrame from <file> (or stdin if '-' was specified) that was sent to this display.\n"
 	       "                        This option can be specified multiple times for different InfoFrame files.\n"
 	       "  -E, --eld <file>      Parse the EDID-Like Data, ELD from <file> (or stdin if '-' was specified).\n"
 	       "                        This option can be specified multiple times for different ELD files.\n"
@@ -1668,7 +1668,7 @@ static bool if_add_byte(const char *s)
 static bool extract_if_hex(const char *s)
 {
 	for (; *s; s++) {
-		if (isspace(*s))
+		if (isspace(*s) || strchr(ignore_chars, *s))
 			continue;
 
 		/* Read one or two hex digits from the log */
@@ -1716,6 +1716,14 @@ static bool extract_if(int fd)
 	if (start)
 		return extract_if_hex(strchr(start, ':') + 1);
 
+	unsigned i;
+
+	for (i = 0; i < 32 && (isspace(data[i]) || strchr(ignore_chars, data[i]) ||
+			       tolower(data[i]) == 'x' || isxdigit(data[i])); i++);
+
+	if (i == 32)
+		return extract_if_hex(data);
+
 	// Drop the extra '\0' byte since we now assume binary data
 	if_data.pop_back();
 
@@ -1744,7 +1752,10 @@ static int if_from_file(const char *from_file)
 	memset(infoframe, 0, sizeof(infoframe));
 	if_size = 0;
 
-	if ((fd = open(from_file, flags)) == -1) {
+	if (!strcmp(from_file, "-")) {
+		from_file = "stdin";
+		fd = 0;
+	} else if ((fd = open(from_file, flags)) == -1) {
 		perror(from_file);
 		return -1;
 	}

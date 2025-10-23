@@ -472,6 +472,8 @@ void edid_state::cta_audio_block(const unsigned char *x, unsigned length)
 		fail("Broken CTA-861 audio block length %d.\n", length);
 		return;
 	}
+	if (!length)
+		fail("This Data Block is empty.\n");
 
 	for (i = 0; i < length; i += 3) {
 		format = (x[i] & 0x78) >> 3;
@@ -1821,15 +1823,17 @@ const char *cta_speaker_map[] = {
 	"FL/FR - Front Left/Right",
 	"LFE1 - Low Frequency Effects 1",
 	"FC - Front Center",
-	"BL/BR - Back Left/Right",
+	"LS/RS - Left/Right Surround",
 	"BC - Back Center",
 	"FLc/FRc - Front Left/Right of Center",
-	"RLC/RRC - Rear Left/Right of Center (Deprecated)",
+	"BL/BR - Back Left/Right",
 	"FLw/FRw - Front Left/Right Wide",
 
 	"TpFL/TpFR - Top Front Left/Right",
 	"TpC - Top Center",
 	"TpFC - Top Front Center",
+
+	// The following speakers are Deprecated in the SADB
 	"LS/RS - Left/Right Surround",
 	"LFE2 - Low Frequency Effects 2",
 	"TpBC - Top Back Center",
@@ -1839,14 +1843,13 @@ const char *cta_speaker_map[] = {
 	"TpBL/TpBR - Top Back Left/Right",
 	"BtFC - Bottom Front Center",
 	"BtFL/BtFR - Bottom Front Left/Right",
-	"TpLS/TpRS - Top Left/Right Surround (Deprecated for CTA-861)",
-	"LSd/RSd - Left/Right Surround Direct (HDMI only)",
+	"TpLS/TpRS - Top Left/Right Surround",
 	NULL
 };
 
 void edid_state::cta_sadb(const unsigned char *x, unsigned length)
 {
-	unsigned sad_deprecated = 0x7f000;
+	unsigned sad_valid = 0x7f;
 	unsigned sad;
 	unsigned i;
 
@@ -1858,13 +1861,13 @@ void edid_state::cta_sadb(const unsigned char *x, unsigned length)
 	sad = ((x[2] << 16) | (x[1] << 8) | x[0]);
 
 	for (i = 0; cta_speaker_map[i]; i++) {
-		bool deprecated = sad_deprecated & (1 << i);
+		bool valid = sad_valid & (1 << i);
 
 		if ((sad >> i) & 1)
 			printf("    %s%s\n", cta_speaker_map[i],
-			       deprecated ? " (Deprecated, use the RCDB)" : "");
+			       valid ? "" : " (Deprecated, use the RCDB)");
 	}
-	if (sad & 0xff040)
+	if (sad & ~sad_valid)
 		warn("Specifies deprecated speakers.\n");
 }
 
@@ -2059,6 +2062,33 @@ static double decode_uchar_as_double(unsigned char x)
 	return s / 64.0;
 }
 
+const char *cta_rcdb_speaker_map[] = {
+	"FL/FR - Front Left/Right",
+	"LFE1 - Low Frequency Effects 1",
+	"FC - Front Center",
+	"BL/BR - Back Left/Right",
+	"BC - Back Center",
+	"FLc/FRc - Front Left/Right of Center",
+	"RLC/RRC - Left/Right Rear Surround (Deprecated)",
+	"FLw/FRw - Front Left/Right Wide",
+
+	"TpFL/TpFR - Top Front Left/Right",
+	"TpC - Top Center",
+	"TpFC - Top Front Center",
+	"LS/RS - Left/Right Surround",
+	"LFE2 - Low Frequency Effects 2",
+	"TpBC - Top Back Center",
+	"SiL/SiR - Side Left/Right",
+	"TpSiL/TpSiR - Top Side Left/Right",
+
+	"TpBL/TpBR - Top Back Left/Right",
+	"BtFC - Bottom Front Center",
+	"BtFL/BtFR - Bottom Front Left/Right",
+	"TpLS/TpRS - Top Left/Right Surround (Deprecated)",
+	NULL
+};
+
+
 void edid_state::cta_rcdb(const unsigned char *x, unsigned length)
 {
 	unsigned spm = ((x[3] << 16) | (x[2] << 8) | x[1]);
@@ -2084,9 +2114,9 @@ void edid_state::cta_rcdb(const unsigned char *x, unsigned length)
 	}
 
 	printf("    Speaker Presence Mask:\n");
-	for (i = 0; cta_speaker_map[i]; i++) {
+	for (i = 0; cta_rcdb_speaker_map[i]; i++) {
 		if ((spm >> i) & 1)
-			printf("      %s\n", cta_speaker_map[i]);
+			printf("      %s\n", cta_rcdb_speaker_map[i]);
 	}
 
 	if ((x[0] & 0xa0) == 0x80)
@@ -2565,6 +2595,33 @@ void edid_state::cta_displayid_type_10(const unsigned char *x, unsigned length)
 		parse_displayid_type_10_timing(x + i * sz, sz, true);
 }
 
+const char *cta_hdmi_speaker_map[] = {
+	"FL/FR - Front Left/Right",
+	"LFE1 - Low Frequency Effects 1",
+	"FC - Front Center",
+	"BL/BR - Back Left/Right",
+	"BC - Back Center",
+	"FLc/FRc - Front Left/Right of Center",
+	"Reserved",
+	"FLw/FRw - Front Left/Right Wide",
+
+	"TpFL/TpFR - Top Front Left/Right",
+	"TpC - Top Center",
+	"TpFC - Top Front Center",
+	"LS/RS - Left/Right Surround",
+	"LFE2 - Low Frequency Effects 2",
+	"TpBC - Top Back Center",
+	"SiL/SiR - Side Left/Right",
+	"TpSiL/TpSiR - Top Side Left/Right",
+
+	"TpBL/TpBR - Top Back Left/Right",
+	"BtFC - Bottom Front Center",
+	"BtFL/BtFR - Bottom Front Left/Right",
+	"TpLS/TpRS - Top Left/Right Surround",
+	"LSd/RSd - Left/Right Surround Direct",
+	NULL
+};
+
 static void cta_hdmi_audio_block(const unsigned char *x, unsigned length)
 {
 	unsigned num_descs;
@@ -2584,6 +2641,7 @@ static void cta_hdmi_audio_block(const unsigned char *x, unsigned length)
 	num_descs = x[1] & 7;
 	if (num_descs == 0)
 		return;
+	warn("Support for HDMI 3D Audio is deprecated since HDMI 2.2.\n"); 
 	length -= 2;
 	x += 2;
 	while (length >= 4) {
@@ -2624,9 +2682,9 @@ static void cta_hdmi_audio_block(const unsigned char *x, unsigned length)
 				return;
 			}
 
-			for (i = 0; cta_speaker_map[i]; i++) {
+			for (i = 0; cta_hdmi_speaker_map[i]; i++) {
 				if ((sad >> i) & 1)
-					printf("      %s\n", cta_speaker_map[i]);
+					printf("      %s\n", cta_hdmi_speaker_map[i]);
 			}
 		}
 		length -= 4;

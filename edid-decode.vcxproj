@@ -224,6 +224,7 @@
     <ClInclude Include="winedid.h" />
   </ItemGroup>
   <ItemGroup>
+    <None Include=".github\workflows\msbuild.yml" />
     <None Include="Directory.Build.props" />
     <None Include="packages.config" />
     <None Include="README.md" />

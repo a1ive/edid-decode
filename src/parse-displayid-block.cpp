@@ -107,6 +107,14 @@ void edid_state::parse_displayid_product_id(const unsigned char *x)
 		buf[x[14]] = 0;
 		printf("    Product ID: %s\n", buf);
 	}
+
+	unsigned len = x[2];
+	if (len < 12)
+		fail("Product Identification payload length (%u) is less than minimum required (12 bytes).\n", len);
+	if (week != 0 && week != 0xff && (week < 1 || week > 52))
+		fail("Week of Manufacture/Model Tag (%u) is out of valid range (0, 1-52, or 0xFF).\n", week);
+	if (week == 0xff && x[13] < 0x0f)
+		fail("Model Year specified (Week=0xFF) but Year value (%u) is in RESERVED range (0x00-0x0E).\n", x[13]);
 }
 
 // tag 0x01
@@ -387,6 +395,11 @@ void edid_state::parse_displayid_type_1_7_timing(const unsigned char *x,
 		if (match_timings(t, cvt_t))
 			fail("This T7VTDB can be represented as a T10VTDB.\n");
 	}
+
+	if (t.pixclk_khz > 16777216)
+		fail("Pixel Clock (%.3f MP/s) exceeds maximum (16,777.216 MP/s).\n", t.pixclk_khz / 1000.0);
+	if (t.hact > 65536 || t.vact > 65536)
+		fail("Active image dimensions exceed maximum (65536): %ux%u.\n", t.hact, t.vact);
 }
 
 // tag 0x04
@@ -1236,31 +1249,56 @@ void edid_state::parse_displayid_parameters_v2(const unsigned char *x,
 	switch ((v >> 3) & 0x03) {
 	case 0x00: printf("Minimum guaranteed value\n"); break;
 	case 0x01: printf("Guidance for the Source device\n"); break;
-	default: printf("Reserved\n"); break;
+	default:
+		printf("Reserved\n");
+		fail("Luminance Information field uses reserved value (%u).\n", (v >> 3) & 0x03);
+		break;
 	}
 	printf("    Color Information: CIE %u\n",
 	       (v & 0x40) ? 1976 : 1931);
 	printf("    Audio Speaker Information: %sintegrated\n",
 	       (v & 0x80) ? "not " : "");
+
+	double prim1_x = fp2d(x[0x0c] | ((x[0x0d] & 0x0f) << 8));
+	double prim1_y = fp2d(((x[0x0d] & 0xf0) >> 4) | (x[0x0e] << 4));
+	double prim2_x = fp2d(x[0x0f] | ((x[0x10] & 0x0f) << 8));
+	double prim2_y = fp2d(((x[0x10] & 0xf0) >> 4) | (x[0x11] << 4));
+	double prim3_x = fp2d(x[0x12] | ((x[0x13] & 0x0f) << 8));
+	double prim3_y = fp2d(((x[0x13] & 0xf0) >> 4) | (x[0x14] << 4));
+	double white_x = fp2d(x[0x15] | ((x[0x16] & 0x0f) << 8));
+	double white_y = fp2d(((x[0x16] & 0xf0) >> 4) | (x[0x17] << 4));
+
 	printf("    Native Color Chromaticity:\n");
-	printf("      Primary #1:  (%.6f, %.6f)\n",
-	       fp2d(x[0x0c] | ((x[0x0d] & 0x0f) << 8)),
-	       fp2d(((x[0x0d] & 0xf0) >> 4) | (x[0x0e] << 4)));
-	printf("      Primary #2:  (%.6f, %.6f)\n",
-	       fp2d(x[0x0f] | ((x[0x10] & 0x0f) << 8)),
-	       fp2d(((x[0x10] & 0xf0) >> 4) | (x[0x11] << 4)));
-	printf("      Primary #3:  (%.6f, %.6f)\n",
-	       fp2d(x[0x12] | ((x[0x13] & 0x0f) << 8)),
-	       fp2d(((x[0x13] & 0xf0) >> 4) | (x[0x14] << 4)));
-	printf("      White Point: (%.6f, %.6f)\n",
-	       fp2d(x[0x15] | ((x[0x16] & 0x0f) << 8)),
-	       fp2d(((x[0x16] & 0xf0) >> 4) | (x[0x17] << 4)));
+	printf("      Primary #1:  (%.6f, %.6f)\n", prim1_x, prim1_y);
+	printf("      Primary #2:  (%.6f, %.6f)\n", prim2_x, prim2_y);
+	printf("      Primary #3:  (%.6f, %.6f)\n", prim3_x, prim3_y);
+	printf("      White Point: (%.6f, %.6f)\n", white_x, white_y);
+
+	if (prim1_x < 0.0 || prim1_x > 1.0 || prim1_y < 0.0 || prim1_y > 1.0 ||
+	    prim2_x < 0.0 || prim2_x > 1.0 || prim2_y < 0.0 || prim2_y > 1.0 ||
+	    prim3_x < 0.0 || prim3_x > 1.0 || prim3_y < 0.0 || prim3_y > 1.0 ||
+	    white_x < 0.0 || white_x > 1.0 || white_y < 0.0 || white_y > 1.0) {
+		fail("Chromaticity coordinates are out of valid range (0.0-1.0).\n");
+	}
+
 	printf("    Native Maximum Luminance (Full Coverage): %s\n",
 	       ieee7542d(x[0x18] | (x[0x19] << 8)).c_str());
 	printf("    Native Maximum Luminance (10%% Rectangular Coverage): %s\n",
 	       ieee7542d(x[0x1a] | (x[0x1b] << 8)).c_str());
 	printf("    Native Minimum Luminance: %s\n",
 	       ieee7542d(x[0x1c] | (x[0x1d] << 8)).c_str());
+
+	if ((x[0x18] | (x[0x19] << 8)) == 0x8000) {
+		if ((v >> 3) & 0x03) {
+			fail("Luminance Information field should be 0 when Maximum Luminance (Full Coverage) is -0.\n");
+		}
+	}
+	if ((x[0x1a] | (x[0x1b] << 8)) == 0x8000) {
+		if ((v >> 3) & 0x03) {
+			fail("Luminance Information field should be 0 when Maximum Luminance (10%%) is -0.\n");
+		}
+	}
+
 	printf("    Native Color Depth: ");
 	if (!(x[0x1e] & 0x07))
 		printf("Not defined\n");
@@ -1281,6 +1319,16 @@ void edid_state::parse_displayid_parameters_v2(const unsigned char *x,
 	if (x[0x1f] != 0xff)
 		printf("    Native Gamma EOTF: %.2f\n",
 		       (100 + x[0x1f]) / 100.0);
+
+	if ((w == 0) != (h == 0))
+		fail("Invalid Native Pixel Format: one dimension is zero while the other is not (%ux%u).\n", w, h);
+	if (w > 65535 || h > 65535)
+		fail("Native Pixel Format exceeds maximum value (%ux%u > 65535x65535).\n", w, h);
+	if (x[0x1f] != 0xff) {
+		double gamma = (100 + x[0x1f]) / 100.0;
+		if (gamma < 1.00 || gamma > 3.754)
+			fail("Native Gamma EOTF (%.2f) is out of valid range (1.00-3.754).\n", gamma);
+	}
 }
 
 // tag 0x24
@@ -1323,6 +1371,11 @@ void edid_state::parse_displayid_type_9_timing(const unsigned char *x)
 	edid_cvt_mode(1 + x[5], t);
 
 	print_timings("    ", &t, "CVT", s.c_str());
+
+	if (t.hact > 65536 || t.vact > 65536)
+		fail("Type IX active image dimensions exceed maximum (65536): %ux%u.\n", t.hact, t.vact);
+	if (1 + x[5] > 256)
+		fail("Type IX refresh rate (%u Hz) exceeds maximum (256 Hz).\n", 1 + x[5]);
 }
 
 // tag 0x25
@@ -1334,17 +1387,44 @@ void edid_state::parse_displayid_dynamic_video_timings_range_limits(const unsign
 	if (!check_displayid_datablock_length(x, 9, 9))
 		return;
 
-	printf("    Minimum Pixel Clock: %u kHz\n",
-	       1 + (x[3] | (x[4] << 8) | (x[5] << 16)));
-	printf("    Maximum Pixel Clock: %u kHz\n",
-	       1 + (x[6] | (x[7] << 8) | (x[8] << 16)));
-	printf("    Minimum Vertical Refresh Rate: %u Hz\n", x[9]);
-	if (x[1] & 7)
-		printf("    Maximum Vertical Refresh Rate: %u Hz\n", x[10] + ((x[11] & 3) << 8));
-	else
-		printf("    Maximum Vertical Refresh Rate: %u Hz\n", x[10]);
+	unsigned min_pixclk = 1 + (x[3] | (x[4] << 8) | (x[5] << 16));
+	unsigned max_pixclk = 1 + (x[6] | (x[7] << 8) | (x[8] << 16));
+	unsigned min_refresh = x[9];
+	unsigned max_refresh;
+
+	printf("    Minimum Pixel Clock: %u kHz\n", min_pixclk);
+	printf("    Maximum Pixel Clock: %u kHz\n", max_pixclk);
+	printf("    Minimum Vertical Refresh Rate: %u Hz\n", min_refresh);
+
+	if (x[1] & 7) {
+		max_refresh = x[10] + ((x[11] & 3) << 8);
+		printf("    Maximum Vertical Refresh Rate: %u Hz\n", max_refresh);
+		if (max_refresh > 1023) {
+			fail("Maximum Vertical Refresh Rate (%u Hz) exceeds maximum (1023 Hz).\n", max_refresh);
+		}
+	} else {
+		max_refresh = x[10];
+		printf("    Maximum Vertical Refresh Rate: %u Hz\n", max_refresh);
+		if (max_refresh > 255) {
+			fail("Maximum Vertical Refresh Rate (%u Hz) exceeds maximum (255 Hz for Revision 0).\n", max_refresh);
+		}
+	}
+
 	printf("    Seamless Dynamic Video Timing Support: %s\n",
 	       (x[11] & 0x80) ? "Yes" : "No");
+
+	if (min_pixclk > max_pixclk) {
+		fail("Minimum Pixel Clock (%u kHz) is greater than Maximum Pixel Clock (%u kHz).\n",
+		     min_pixclk, max_pixclk);
+	}
+	if (max_pixclk > 16777216) {
+		fail("Maximum Pixel Clock (%u kHz = %.3f MP/s) exceeds maximum (16,777.216 MP/s).\n",
+		     max_pixclk, max_pixclk / 1000.0);
+	}
+	if (min_refresh > max_refresh) {
+		fail("Minimum Vertical Refresh Rate (%u Hz) is greater than Maximum Vertical Refresh Rate (%u Hz).\n",
+		     min_refresh, max_refresh);
+	}
 }
 
 // tag 0x26
@@ -1619,7 +1699,314 @@ void edid_state::parse_displayid_arvr_hmd(const unsigned char *x)
 	if (!check_displayid_datablock_length(x, 79, 79))
 		return;
 
-	// TODO: parse the DB
+	unsigned v;
+
+	// Offset 0x03: Dual Layer Single Stream Transport Support
+	v = x[3] & 0x03;
+	printf("    Dual Layer with Single-Stream Transport: ");
+	switch (v) {
+	case 0: printf("Not Supported by the HMD\n"); break;
+	case 1: printf("Interleaving Supported by the HMD\n"); break;
+	case 2: printf("Extended Frame Supported by the HMD\n"); break;
+	case 3: printf("Both Extended Frame and Interleaving Supported by the HMD\n"); break;
+	}
+
+	if (x[3] & 0x0c)
+		fail("Reserved bits 3:2 of byte 0x03 are not zero.\n");
+
+	if (x[3] & 0x01) {
+		printf("    Dual Layer Single-Stream Interleaving Mode: %s\n",
+		       (x[3] & 0x10) ? "Left then Right Stacked, Layers Interleaved on Frames" :
+				      "Left then Right Side-by-Side, Layers Interleaved on Frames");
+	}
+
+	if (x[3] & 0x02) {
+		v = (x[3] >> 5) & 0x03;
+		printf("    Dual Layer Single-Stream Extended Frame Mode: ");
+		switch (v) {
+		case 0: printf("Left then Right Side-by-Side, Layers Side-by-Side\n"); break;
+		case 1: printf("Left then Right Stacked, Layers Side-by-Side\n"); break;
+		case 2: printf("Left then Right Side-by-Side, Layers Stacked\n"); break;
+		case 3:
+			printf("Reserved\n");
+			fail("Reserved Extended Frame Mode value.\n");
+			break;
+		}
+	}
+
+	if (x[3] & 0x80)
+		fail("Reserved bit 7 of byte 0x03 is not zero.\n");
+
+	// Offset 0x04: Number of Displays and Streams
+	v = x[4] & 0x0f;
+	printf("    Number of Displays: ");
+	switch (v) {
+	case 0: printf("One\n"); break;
+	case 1: printf("Two\n"); break;
+	case 2: printf("Three\n"); break;
+	case 3: printf("Four\n"); break;
+	default:
+		printf("Reserved (%u)\n", v);
+		fail("Reserved Number of Displays value %u.\n", v);
+		break;
+	}
+
+	v = (x[4] >> 4) & 0x0f;
+	printf("    Number of Streams: ");
+	switch (v) {
+	case 0: printf("One\n"); break;
+	case 1: printf("Two\n"); break;
+	default:
+		printf("Reserved (%u)\n", v);
+		fail("Reserved Number of Streams value %u.\n", v);
+		break;
+	}
+
+	// Offset 0x05: Layers
+	unsigned num_layers = x[5] & 0x0f;
+	printf("    Number of Layers: ");
+	switch (num_layers) {
+	case 0: printf("Single Layer\n"); break;
+	case 1: printf("Two Layers\n"); break;
+	default:
+		printf("Reserved (%u)\n", num_layers);
+		fail("Reserved Number of Layers value %u.\n", num_layers);
+		break;
+	}
+
+	unsigned layer_metadata = (x[5] >> 4) & 0x03;
+	printf("    Layer Metadata Support: ");
+	switch (layer_metadata) {
+	case 0: printf("None\n"); break;
+	case 1: printf("1st Line of Layer 0\n"); break;
+	case 2: printf("AR/VR SDP\n"); break;
+	case 3: printf("Both 1st Line and AR/VR SDP\n"); break;
+	}
+
+	// Sanity check: Layer Metadata only relevant if more than one layer
+	if (num_layers == 0 && layer_metadata != 0)
+		warn("Layer Metadata Support is set but only single layer supported.\n");
+
+	v = (x[5] >> 6) & 0x03;
+	if ((x[5] >> 4) & 0x01) {
+		printf("    Replication Factor: ");
+		switch (v) {
+		case 0: printf("1 (no replication)\n"); break;
+		case 1: printf("4\n"); break;
+		case 2: printf("8\n"); break;
+		case 3: printf("16\n"); break;
+		}
+	} else if (v) {
+		fail("Replication Factor should be 0 when 1st Line metadata not supported.\n");
+	}
+
+	// Offset 0x06-0x11: Area of Low Distortion Field Set
+	printf("    Right Low Distortion Area X Coordinate: %u pixels\n",
+	       x[6] | (x[7] << 8));
+	printf("    Right Low Distortion Area Y Coordinate: %u lines\n",
+	       x[8] | (x[9] << 8));
+	printf("    Left Low Distortion Area X Coordinate: %u pixels\n",
+	       x[0x0a] | (x[0x0b] << 8));
+	printf("    Left Low Distortion Area Y Coordinate: %u lines\n",
+	       x[0x0c] | (x[0x0d] << 8));
+	printf("    Low Distortion Area Width: %u pixels\n",
+	       x[0x0e] | (x[0x0f] << 8));
+	printf("    Low Distortion Area Height: %u lines\n",
+	       x[0x10] | (x[0x11] << 8));
+
+	// Offset 0x12: Eye Rotation Orientation
+	v = x[0x12] & 0x07;
+	printf("    Right Eye Rotation Orientation: ");
+	if (v == 0)
+		printf("Standard orientation #0 (no rotation required)\n");
+	else
+		printf("Orientation #%u\n", v);
+
+	if (x[0x12] & 0x08)
+		fail("Reserved bit 3 of byte 0x12 is not zero.\n");
+
+	v = (x[0x12] >> 4) & 0x07;
+	printf("    Left Eye Rotation Orientation: ");
+	if (v == 0)
+		printf("Standard orientation #0 (no rotation required)\n");
+	else
+		printf("Orientation #%u\n", v);
+
+	if (x[0x12] & 0x80)
+		fail("Reserved bit 7 of byte 0x12 is not zero.\n");
+
+	// Offset 0x13-0x18: Optics Field Set (+3.13 fixed point format)
+	double right_lens_diameter = (x[0x13] | (x[0x14] << 8)) / 8192.0;
+	printf("    Right Lens Diameter: %.4f cm\n", right_lens_diameter);
+
+	double left_lens_diameter = (x[0x15] | (x[0x16] << 8)) / 8192.0;
+	printf("    Left Lens Diameter: %.4f cm\n", left_lens_diameter);
+
+	double interocular_angle = (x[0x17] | (x[0x18] << 8)) / 8192.0;
+	printf("    Interocular Angle: %.4f rad\n", interocular_angle);
+
+	// Sanity checks for optics
+	if (right_lens_diameter > 10.0)
+		warn("Right Lens Diameter %.4f cm seems unusually large.\n", right_lens_diameter);
+	if (left_lens_diameter > 10.0)
+		warn("Left Lens Diameter %.4f cm seems unusually large.\n", left_lens_diameter);
+	if (interocular_angle > 1.0)
+		warn("Interocular Angle %.4f rad may be unusable (spec notes ~1 rad becomes unusable).\n", interocular_angle);
+
+	// Offset 0x19-0x25: Lens Adjustment Field Set
+	bool lens_adjustable = x[0x19] & 0x01;
+	printf("    Lens Adjustment: %s\n",
+	       lens_adjustable ? "Adjustable" : "Fixed");
+
+	v = (x[0x19] >> 1) & 0x03;
+	printf("    Lens Adjust Motion: ");
+	switch (v) {
+	case 0: printf("Lenses do not move in a straight line\n"); break;
+	case 1: printf("Lenses and displays move together in a straight line\n"); break;
+	case 2: printf("Lenses move in a straight line, displays remain stationary\n"); break;
+	case 3:
+		printf("Reserved\n");
+		fail("Reserved Lens Adjust Motion value.\n");
+		break;
+	}
+
+	if (lens_adjustable) {
+		printf("    Lens Distance Available: %s\n",
+		       (x[0x19] & 0x08) ? "Yes" : "No");
+	}
+
+	printf("    IPD Useful to HMD: %s\n",
+	       (x[0x19] & 0x10) ? "Yes" : "No");
+
+	if (x[0x19] & 0xe0)
+		fail("Reserved bits 7:5 of byte 0x19 are not zero.\n");
+
+	double lens_adjust_min = (x[0x1a] | (x[0x1b] << 8)) / 8192.0;
+	double lens_adjust_range = (x[0x1c] | (x[0x1d] << 8)) / 8192.0;
+	double ipd_center_offset = (short)(x[0x1e] | (x[0x1f] << 8)) / 8192.0;
+	double ipd_meas_min = (x[0x20] | (x[0x21] << 8)) / 8192.0;
+	double ipd_meas_range = (x[0x22] | (x[0x23] << 8)) / 8192.0;
+
+	printf("    Lens Adjust Minimum: %.4f cm\n", lens_adjust_min);
+	printf("    Lens Adjustment Range: %.4f cm\n", lens_adjust_range);
+	printf("    IPD Center Offset: %.4f cm\n", ipd_center_offset);
+	printf("    IPD Measurement Minimum: %.4f cm\n", ipd_meas_min);
+	printf("    IPD Measurement Range: %.4f cm\n", ipd_meas_range);
+
+	// Sanity checks for lens adjustment
+	if (!lens_adjustable && lens_adjust_range != 0)
+		fail("Lens Adjustment Range is non-zero but lenses are fixed.\n");
+	if (!lens_adjustable && ipd_meas_range != 0)
+		warn("IPD Measurement Range is non-zero but lenses are fixed.\n");
+
+	// Offset 0x24: Lens Adjustments Available in HMD
+	if (x[0x24] & 0x01)
+		printf("    Distance to Right Display Available\n");
+	if (x[0x24] & 0x02)
+		printf("    Distance to Left Display Available\n");
+	if (x[0x24] & 0x04)
+		printf("    Distance to Right Eye Available\n");
+	if (x[0x24] & 0x08)
+		printf("    Distance to Left Eye Available\n");
+	if (x[0x24] & 0xf0)
+		fail("Reserved bits 7:4 of byte 0x24 are not zero.\n");
+
+	// Offset 0x25: Foveated Rendering Support
+	v = x[0x25] & 0x03;
+	printf("    Foveated Rendering Support: ");
+	switch (v) {
+	case 0: printf("Not Supported\n"); break;
+	case 1: printf("Single Stream\n"); break;
+	case 2: printf("Dual Streams\n"); break;
+	case 3: printf("Single or Dual Streams\n"); break;
+	}
+	if (x[0x25] & 0xfc)
+		fail("Reserved bits 7:2 of byte 0x25 are not zero.\n");
+
+	// Offset 0x26-0x3F: Field of View (FoV) for Layer 0 Field Set
+	double h_fov = (x[0x26] | (x[0x27] << 8)) / 8192.0;
+	double r_fov_right = (x[0x28] | (x[0x29] << 8)) / 8192.0;
+	double r_fov_left = (x[0x2a] | (x[0x2b] << 8)) / 8192.0;
+	double r_fov_up = (x[0x2c] | (x[0x2d] << 8)) / 8192.0;
+	double r_fov_down = (x[0x2e] | (x[0x2f] << 8)) / 8192.0;
+	double l_fov_right = (x[0x30] | (x[0x31] << 8)) / 8192.0;
+	double l_fov_left = (x[0x32] | (x[0x33] << 8)) / 8192.0;
+	double l_fov_up = (x[0x34] | (x[0x35] << 8)) / 8192.0;
+	double l_fov_down = (x[0x36] | (x[0x37] << 8)) / 8192.0;
+
+	printf("    Horizontal FoV: %.4f rad\n", h_fov);
+	printf("    Right FoV Right: %.4f rad\n", r_fov_right);
+	printf("    Right FoV Left: %.4f rad\n", r_fov_left);
+	printf("    Right FoV Up: %.4f rad\n", r_fov_up);
+	printf("    Right FoV Down: %.4f rad\n", r_fov_down);
+	printf("    Left FoV Right: %.4f rad\n", l_fov_right);
+	printf("    Left FoV Left: %.4f rad\n", l_fov_left);
+	printf("    Left FoV Up: %.4f rad\n", l_fov_up);
+	printf("    Left FoV Down: %.4f rad\n", l_fov_down);
+
+	// +16.16 fixed point for focal lengths
+	unsigned r_focal = x[0x38] | (x[0x39] << 8) | (x[0x3a] << 16) | (x[0x3b] << 24);
+	unsigned l_focal = x[0x3c] | (x[0x3d] << 8) | (x[0x3e] << 16) | (x[0x3f] << 24);
+	double r_focal_length = r_focal / 65536.0;
+	double l_focal_length = l_focal / 65536.0;
+	printf("    Right Focal Length: %.4f pixels/rad\n", r_focal_length);
+	printf("    Left Focal Length: %.4f pixels/rad\n", l_focal_length);
+
+	// Sanity checks for FoV and focal length
+	if (h_fov == 0)
+		fail("Horizontal FoV is zero.\n");
+	if (r_focal_length == 0)
+		fail("Right Focal Length is zero.\n");
+	if (l_focal_length == 0)
+		fail("Left Focal Length is zero.\n");
+
+	// Offset 0x40-0x4F: Center of Projection Field Set (IEEE754 single precision floats)
+	float f;
+	unsigned u;
+
+	u = x[0x40] | (x[0x41] << 8) | (x[0x42] << 16) | (x[0x43] << 24);
+	memcpy(&f, &u, sizeof(f));
+	printf("    Right Center of Projection Y: %.4f\n", f);
+
+	u = x[0x44] | (x[0x45] << 8) | (x[0x46] << 16) | (x[0x47] << 24);
+	memcpy(&f, &u, sizeof(f));
+	printf("    Right Center of Projection X: %.4f\n", f);
+
+	u = x[0x48] | (x[0x49] << 8) | (x[0x4a] << 16) | (x[0x4b] << 24);
+	memcpy(&f, &u, sizeof(f));
+	printf("    Left Center of Projection Y: %.4f\n", f);
+
+	u = x[0x4c] | (x[0x4d] << 8) | (x[0x4e] << 16) | (x[0x4f] << 24);
+	memcpy(&f, &u, sizeof(f));
+	printf("    Left Center of Projection X: %.4f\n", f);
+
+	// Offset 0x50-0x51: Streams per Layer Field Set
+	unsigned layer0_streams = x[0x50] & 0x03;
+	printf("    Layer 0 Streams: ");
+	switch (layer0_streams) {
+	case 0: printf("Not Supported\n"); break;
+	case 1: printf("One Stream\n"); break;
+	case 2: printf("Two Streams Only\n"); break;
+	case 3: printf("One or Two Streams\n"); break;
+	}
+
+	unsigned layer1_streams = (x[0x50] >> 2) & 0x03;
+	printf("    Layer 1 Streams: ");
+	switch (layer1_streams) {
+	case 0: printf("Not Supported\n"); break;
+	case 1: printf("One Stream\n"); break;
+	case 2: printf("Two Streams Only\n"); break;
+	case 3: printf("One or Two Streams\n"); break;
+	}
+
+	if ((x[0x50] & 0xf0) || x[0x51])
+		fail("Reserved bits 15:4 of Streams per Layer are not zero.\n");
+
+	// Sanity checks for Streams per Layer
+	if (layer0_streams == 0)
+		fail("Layer 0 must support at least one stream.\n");
+	if (num_layers == 0 && layer1_streams != 0)
+		fail("Layer 1 Streams is set but only single layer supported.\n");
 }
 
 // tag 0x2d
@@ -1636,7 +2023,186 @@ void edid_state::parse_displayid_arvr_layer(const unsigned char *x)
 	if (!check_displayid_datablock_length(x, 20, 20))
 		return;
 
-	// TODO: parse the DB
+	unsigned v;
+
+	// Offset 0x03-0x05: HMD Manufacturer/Vendor ID (24-bit IEEE OUI)
+	printf("    HMD Manufacturer/Vendor ID: %02X-%02X-%02X\n",
+	       x[3], x[4], x[5]);
+	if (!x[3] && !x[4] && !x[5])
+		fail("HMD Manufacturer/Vendor ID is all zeros (invalid IEEE OUI).\n");
+
+	// Offset 0x06-0x07: HMD Product ID Code
+	unsigned product_id = x[6] | (x[7] << 8);
+	printf("    HMD Product ID Code: %u\n", product_id);
+	if (!product_id)
+		fail("HMD Product ID Code is zero.\n");
+
+	// Offset 0x08-0x0B: HMD Serial Number
+	unsigned sn = x[8] | (x[9] << 8) | (x[0x0a] << 16) | (x[0x0b] << 24);
+	if (sn) {
+		if (hide_serial_numbers)
+			printf("    HMD Serial Number: ...\n");
+		else
+			printf("    HMD Serial Number: %u\n", sn);
+	}
+
+	// Offset 0x0C: Layers
+	v = x[0x0c] & 0x0f;
+	printf("    Layer Number: ");
+	switch (v) {
+	case 0: printf("Layer 0\n"); break;
+	case 1: printf("Layer 1\n"); break;
+	default:
+		printf("Reserved (%u)\n", v);
+		fail("Reserved Layer Number value %u.\n", v);
+		break;
+	}
+
+	printf("    Layer Configurable: %s\n",
+	       (x[0x0c] & 0x10) ? "Yes" : "No");
+	printf("    Cropping Supported: %s\n",
+	       (x[0x0c] & 0x20) ? "Yes" : "No");
+
+	if (x[0x0c] & 0xc0)
+		fail("Reserved bits 7:6 of byte 0x0C are not zero.\n");
+
+	// Offset 0x0D: Reserved (for tile location)
+	if (x[0x0d])
+		fail("Reserved byte 0x0D is not zero.\n");
+
+	// Offset 0x0E: Lens Distortion
+	unsigned lens_support = x[0x0e] & 0x03;
+	printf("    Lens Distortion Support: ");
+	switch (lens_support) {
+	case 0: printf("None\n"); break;
+	case 1: printf("Chromatic Aberration Correction\n"); break;
+	case 2: printf("Lens Distortion and Chromatic Aberration Correction\n"); break;
+	case 3:
+		printf("Reserved\n");
+		fail("Reserved Lens Distortion Support value.\n");
+		break;
+	}
+
+	unsigned lens_config = (x[0x0e] >> 2) & 0x03;
+	printf("    Lens Distortion Configurable: ");
+	switch (lens_config) {
+	case 0: printf("Not Configurable\n"); break;
+	case 1: printf("Chromatic Aberration Only\n"); break;
+	case 2: printf("Both Chromatic Aberration and Lens Distortion\n"); break;
+	case 3:
+		printf("Reserved\n");
+		fail("Reserved Lens Distortion Configurable value.\n");
+		break;
+	}
+
+	// Sanity check: configurable should not exceed support
+	if (lens_support == 0 && lens_config != 0)
+		fail("Lens Distortion Configurable is set but no Lens Distortion Support.\n");
+	if (lens_support == 1 && lens_config == 2)
+		fail("Lens Distortion Configurable includes Lens Distortion but only Chromatic Aberration is supported.\n");
+
+	if (x[0x0e] & 0xf0)
+		fail("Reserved bits 7:4 of byte 0x0E are not zero.\n");
+
+	// Offset 0x0F: Gamma, Degamma, Mura, VBI
+	if (x[0x0f] & 0x01)
+		printf("    Gamma Support\n");
+	if (x[0x0f] & 0x02)
+		printf("    Gamma Configurable\n");
+	if (x[0x0f] & 0x04)
+		printf("    Degamma Support\n");
+	if (x[0x0f] & 0x08)
+		printf("    Degamma Configurable\n");
+	if (x[0x0f] & 0x10)
+		printf("    Mura Compensation Support\n");
+	if (x[0x0f] & 0x20)
+		printf("    Mura Compensation Configurable\n");
+	if (x[0x0f] & 0x40)
+		printf("    VBI Support\n");
+	if (x[0x0f] & 0x80)
+		printf("    VBI Configurable\n");
+
+	// Sanity checks: configurable should not be set without support
+	if (!(x[0x0f] & 0x01) && (x[0x0f] & 0x02))
+		fail("Gamma Configurable is set but Gamma Support is not.\n");
+	if (!(x[0x0f] & 0x04) && (x[0x0f] & 0x08))
+		fail("Degamma Configurable is set but Degamma Support is not.\n");
+	if (!(x[0x0f] & 0x10) && (x[0x0f] & 0x20))
+		fail("Mura Compensation Configurable is set but Mura Compensation Support is not.\n");
+	if (!(x[0x0f] & 0x40) && (x[0x0f] & 0x80))
+		fail("VBI Configurable is set but VBI Support is not.\n");
+
+	// Offset 0x10: Asynchronous Reprojection
+	unsigned async_support = x[0x10] & 0x03;
+	printf("    Async Reprojection Support: ");
+	switch (async_support) {
+	case 0: printf("None\n"); break;
+	case 1: printf("3DoF Only\n"); break;
+	case 2: printf("3DoF and 6DoF\n"); break;
+	case 3:
+		printf("Reserved\n");
+		fail("Reserved Async Reprojection Support value.\n");
+		break;
+	}
+
+	unsigned async_config = (x[0x10] >> 2) & 0x03;
+	printf("    Async Reprojection Configurable: ");
+	switch (async_config) {
+	case 0: printf("Neither 3DoF nor 6DoF can be configured\n"); break;
+	case 1: printf("3DoF can be disabled, 6DoF cannot\n"); break;
+	case 2: printf("3DoF cannot be disabled, 6DoF can\n"); break;
+	case 3: printf("Both 3DoF and 6DoF can be disabled\n"); break;
+	}
+
+	// Sanity checks: configurable should not exceed support
+	if (async_support == 0 && async_config != 0)
+		fail("Async Reprojection Configurable is set but no Async Reprojection Support.\n");
+	if (async_support == 1 && (async_config == 2 || async_config == 3))
+		fail("Async Reprojection Configurable includes 6DoF but only 3DoF is supported.\n");
+
+	if (x[0x10] & 0xf0)
+		fail("Reserved bits 7:4 of byte 0x10 are not zero.\n");
+
+	// Offset 0x11: Scaling Support
+	printf("    Scaling Support:");
+	if (x[0x11] & 0x01) printf(" 2x");
+	if (x[0x11] & 0x02) printf(" 3x");
+	if (x[0x11] & 0x04) printf(" 4x");
+	if (x[0x11] & 0x08) printf(" 5x");
+	if (x[0x11] & 0x10) printf(" 6x");
+	if (x[0x11] & 0x20) printf(" 8x");
+	if (x[0x11] & 0x40) printf(" Other");
+	if (!(x[0x11] & 0x7f)) printf(" None");
+	printf("\n");
+
+	printf("    Scaling Configurable: %s\n",
+	       (x[0x11] & 0x80) ? "Yes" : "No");
+
+	// Offset 0x12-0x15: Scaling NonListed (3.5 fixed point format)
+	bool has_nonlisted = x[0x12] || x[0x13] || x[0x14] || x[0x15];
+	if (x[0x11] & 0x40) {
+		if (x[0x12])
+			printf("    Scaling NonListed 0: %.5f\n", x[0x12] / 32.0);
+		if (x[0x13])
+			printf("    Scaling NonListed 1: %.5f\n", x[0x13] / 32.0);
+		if (x[0x14])
+			printf("    Scaling NonListed 2: %.5f\n", x[0x14] / 32.0);
+		if (x[0x15])
+			printf("    Scaling NonListed 3: %.5f\n", x[0x15] / 32.0);
+		if (!has_nonlisted)
+			fail("Scaling Support 'Other' is set but no NonListed scaling factors defined.\n");
+	} else if (has_nonlisted) {
+		fail("NonListed scaling factors are set but Scaling Support 'Other' is not.\n");
+	}
+
+	// Offset 0x16: Multiple Stream Stereo Modes
+	if (x[0x16] & 0x01)
+		printf("    Stereo Mode: Left then Right Side-by-Side, Layers on Separate Streams\n");
+	if (x[0x16] & 0x02)
+		printf("    Stereo Mode: Left then Right Stacked, Layers on Separate Streams\n");
+
+	if (x[0x16] & 0xfc)
+		fail("Reserved bits 7:2 of byte 0x16 are not zero.\n");
 }
 
 // tag 0x2e

@@ -59,7 +59,7 @@ extern "C" int open(const char* pathname, int flags, ...)
 
 		//fprintf(stderr, "Open monitor index %ld\n", monitor_index);
 
-		constexpr size_t EDID_BUFFER_SIZE = 256;
+		constexpr size_t EDID_BUFFER_SIZE = 4096;
 		char edid_buffer[EDID_BUFFER_SIZE];
 		int bytes_read = get_monitor_edid((int)monitor_index, edid_buffer, EDID_BUFFER_SIZE);
 

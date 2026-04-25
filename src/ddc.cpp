@@ -29,6 +29,14 @@
 
 #include "edid-decode.h"
 
+/*
+ * General note when reading from the DDC bus:
+ * avoid reading more than 128 bytes. Trying to read 256 bytes in particular
+ * will not work if there is a DisplayPort to HDMI adapter since the DP
+ * REMOTE_I2C_READ/WRITE requests use 8 bit values for the length, so 256
+ * would map to 0.
+ */
+
 // i2c addresses for edid
 #define EDID_ADDR 0x50
 #define SEGMENT_POINTER_ADDR 0x30
@@ -261,7 +269,7 @@ static int read_hdcp_registers(int adapter_fd, __u8 *hdcp_prim, __u8 *hdcp_sec, 
 	read_message = {
 		.addr = HDCP_PRIM_ADDR,
 		.flags = I2C_M_RD,
-		.len = 256,
+		.len = 128,
 		.buf = hdcp_prim
 	};
 
@@ -270,6 +278,13 @@ static int read_hdcp_registers(int adapter_fd, __u8 *hdcp_prim, __u8 *hdcp_sec, 
 	data.msgs = msgs;
 	data.nmsgs = ARRAY_SIZE(msgs);
 	err = ioctl(adapter_fd, I2C_RDWR, &data);
+	if (err == 2) {
+		// Skip 0x80: that's a single-burst read address for HDCP 2.x.
+		offset = 129;
+		msgs[1].len = 127;
+		msgs[1].buf = hdcp_prim + 129;
+		err = ioctl(adapter_fd, I2C_RDWR, &data);
+	}
 
 	if (err < 0) {
 		fprintf(stderr, "Unable to read Primary Link HDCP: %s\n",
@@ -302,6 +317,7 @@ static int read_hdcp_registers(int adapter_fd, __u8 *hdcp_prim, __u8 *hdcp_sec, 
 		}
 	}
 
+	offset = 0;
 	write_message = {
 		.addr = HDCP_SEC_ADDR,
 		.len = 1,
@@ -310,23 +326,29 @@ static int read_hdcp_registers(int adapter_fd, __u8 *hdcp_prim, __u8 *hdcp_sec, 
 	read_message = {
 		.addr = HDCP_SEC_ADDR,
 		.flags = I2C_M_RD,
-		.len = 256,
+		.len = 128,
 		.buf = hdcp_sec
 	};
 
 	struct i2c_msg sec_msgs[2] = { write_message, read_message };
 	data.msgs = sec_msgs;
 	data.nmsgs = ARRAY_SIZE(msgs);
-	ioctl(adapter_fd, I2C_RDWR, &data);
+	err = ioctl(adapter_fd, I2C_RDWR, &data);
+	if (err == 2) {
+		offset = 128;
+		msgs[1].len = 128;
+		msgs[1].buf = hdcp_sec + 128;
+		err = ioctl(adapter_fd, I2C_RDWR, &data);
+	}
 
 	return 0;
 }
 
 int read_hdcp(int adapter_fd)
 {
-	__u8 hdcp_prim[256];
-	__u8 hdcp_sec[256];
-	__u8 ksv_fifo[128 * 5];
+	__u8 hdcp_prim[256] = {};
+	__u8 hdcp_sec[256] = {};
+	__u8 ksv_fifo[128 * 5] = {};
 
 	hdcp_prim[5] = 0xdd;
 	hdcp_sec[5] = 0xdd;

@@ -49,6 +49,11 @@ int read_edid(int adapter_fd, unsigned char* edid, int silent)
 	return -ENODEV;
 }
 
+int read_hdcp(int adapter_fd, parse_data &pdata)
+{
+	return -ENODEV;
+}
+
 #endif
 
 extern "C" int open(const char* pathname, int flags, ...)

@@ -55,6 +55,12 @@
     <ClCompile Include="winedid.c">
       <Filter>windows-unix</Filter>
     </ClCompile>
+    <ClCompile Include="src\parse-hdcp.cpp">
+      <Filter>edid-decode</Filter>
+    </ClCompile>
+    <ClCompile Include="src\parse-scdc.cpp">
+      <Filter>edid-decode</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\edid-decode.h">

@@ -285,8 +285,7 @@ static int read_hdcp_registers(int adapter_fd, __u8 *hdcp_prim, __u8 *hdcp_sec, 
 		msgs[1].buf = hdcp_prim + 129;
 		err = ioctl(adapter_fd, I2C_RDWR, &data);
 	}
-
-	if (err < 0) {
+	if (err != 2) {
 		fprintf(stderr, "Unable to read Primary Link HDCP: %s\n",
 			strerror(errno));
 		return -1;
@@ -310,7 +309,7 @@ static int read_hdcp_registers(int adapter_fd, __u8 *hdcp_prim, __u8 *hdcp_sec, 
 		data.msgs = ksv_fifo_msgs;
 		data.nmsgs = ARRAY_SIZE(msgs);
 		err = ioctl(adapter_fd, I2C_RDWR, &data);
-		if (err < 0) {
+		if (err != 2) {
 			fprintf(stderr, "Unable to read KSV FIFO: %s\n",
 				strerror(errno));
 			return -1;
@@ -344,106 +343,15 @@ static int read_hdcp_registers(int adapter_fd, __u8 *hdcp_prim, __u8 *hdcp_sec, 
 	return 0;
 }
 
-int read_hdcp(int adapter_fd)
+int read_hdcp(int adapter_fd, parse_data &pdata)
 {
-	__u8 hdcp_prim[256] = {};
-	__u8 hdcp_sec[256] = {};
-	__u8 ksv_fifo[128 * 5] = {};
+	__u8 *hdcp_prim = &pdata.buf[0];
+	__u8 *ksv_fifo = hdcp_prim + 256;
+	__u8 *hdcp_sec = ksv_fifo + 128 * 5;
 
-	hdcp_prim[5] = 0xdd;
-	hdcp_sec[5] = 0xdd;
 	if (read_hdcp_registers(adapter_fd, hdcp_prim, hdcp_sec, ksv_fifo))
 		return -1;
-	printf("HDCP Primary Link Hex Dump:\n\n");
-	hex_block("", hdcp_prim, 128, false);
-	printf("\n");
-	hex_block("", hdcp_prim + 128, 128, false);
-	printf("\n");
-	if (hdcp_sec[5] != 0xdd) {
-		printf("HDCP Secondary Link Hex Dump:\n\n");
-		hex_block("", hdcp_sec, 128, false);
-		printf("\n");
-		hex_block("", hdcp_sec + 128, 128, false);
-		printf("\n");
-	}
-	printf("HDCP Primary Link:\n\n");
-	printf("Bksv: %02x %02x %02x %02x %02x\n",
-	       hdcp_prim[0], hdcp_prim[1], hdcp_prim[2], hdcp_prim[3], hdcp_prim[4]);
-	printf("Ri': %02x %02x\n", hdcp_prim[9], hdcp_prim[8]);
-	printf("Pj': %02x\n", hdcp_prim[0x0a]);
-	printf("Aksv: %02x %02x %02x %02x %02x\n",
-	       hdcp_prim[0x10], hdcp_prim[0x11], hdcp_prim[0x12], hdcp_prim[0x13], hdcp_prim[0x14]);
-	printf("Ainfo: %02x\n", hdcp_prim[0x15]);
-	printf("An: %02x %02x %02x %02x %02x %02x %02x %02x\n",
-	       hdcp_prim[0x18], hdcp_prim[0x19], hdcp_prim[0x1a], hdcp_prim[0x1b],
-	       hdcp_prim[0x1c], hdcp_prim[0x1d], hdcp_prim[0x1e], hdcp_prim[0x1f]);
-	printf("V'.H0: %02x %02x %02x %02x\n",
-	       hdcp_prim[0x20], hdcp_prim[0x21], hdcp_prim[0x22], hdcp_prim[0x23]);
-	printf("V'.H1: %02x %02x %02x %02x\n",
-	       hdcp_prim[0x24], hdcp_prim[0x25], hdcp_prim[0x26], hdcp_prim[0x27]);
-	printf("V'.H2: %02x %02x %02x %02x\n",
-	       hdcp_prim[0x28], hdcp_prim[0x29], hdcp_prim[0x2a], hdcp_prim[0x2b]);
-	printf("V'.H3: %02x %02x %02x %02x\n",
-	       hdcp_prim[0x2c], hdcp_prim[0x2d], hdcp_prim[0x2e], hdcp_prim[0x2f]);
-	printf("V'.H4: %02x %02x %02x %02x\n",
-	       hdcp_prim[0x30], hdcp_prim[0x31], hdcp_prim[0x32], hdcp_prim[0x33]);
-	__u8 v = hdcp_prim[0x40];
-	printf("Bcaps: %02x\n", v);
-	if (v & 0x01)
-		printf("\tFAST_REAUTHENTICATION\n");
-	if (v & 0x02)
-		printf("\t1.1_FEATURES\n");
-	if (v & 0x10)
-		printf("\tFAST\n");
-	if (v & 0x20)
-		printf("\tREADY\n");
-	if (v & 0x40)
-		printf("\tREPEATER\n");
-	__u16 vv = hdcp_prim[0x41] | (hdcp_prim[0x42] << 8);
-	printf("Bstatus: %04x\n", vv);
-	printf("\tDEVICE_COUNT: %u\n", vv & 0x7f);
-	if (vv & 0x80)
-		printf("\tMAX_DEVS_EXCEEDED\n");
-	printf("\tDEPTH: %u\n", (vv >> 8) & 0x07);
-	if (vv & 0x800)
-		printf("\tMAX_CASCADE_EXCEEDED\n");
-	if (vv & 0x1000)
-		printf("\tHDMI_MODE\n");
-	if (vv & 0x7f) {
-		printf("KSV FIFO:\n");
-		for (unsigned i = 0; i < (vv & 0x7f); i++)
-			printf("\t%03u: %02x %02x %02x %02x %02x\n", i,
-			       ksv_fifo[i * 5], ksv_fifo[i * 5 + 1],
-			       ksv_fifo[i * 5 + 2], ksv_fifo[i * 5 + 3],
-			       ksv_fifo[i * 5 + 4]);
-	}
-	v = hdcp_prim[0x50];
-	printf("HDCP2Version: %02x\n", v);
-	if (v & 4)
-		printf("\tHDCP2.2\n");
-	vv = hdcp_prim[0x70] | (hdcp_prim[0x71] << 8);
-	printf("RxStatus: %04x\n", vv);
-	if (vv & 0x3ff)
-		printf("\tMessage_Size: %u\n", vv & 0x3ff);
-	if (vv & 0x400)
-		printf("\tREADY\n");
-	if (vv & 0x800)
-		printf("\tREAUTH_REQ\n");
-
-	if (hdcp_sec[5] == 0xdd)
-		return 0;
-
-	printf("HDCP Secondary Link:\n\n");
-	printf("Bksv: %02x %02x %02x %02x %02x\n",
-	       hdcp_sec[0], hdcp_sec[1], hdcp_sec[2], hdcp_sec[3], hdcp_sec[4]);
-	printf("Ri': %02x %02x\n", hdcp_sec[9], hdcp_sec[9]);
-	printf("Pj': %02x\n", hdcp_sec[0x0a]);
-	printf("Aksv: %02x %02x %02x %02x %02x\n",
-	       hdcp_sec[0x10], hdcp_sec[0x11], hdcp_sec[0x12], hdcp_sec[0x13], hdcp_sec[0x14]);
-	printf("Ainfo: %02x\n", hdcp_sec[0x15]);
-	printf("An: %02x %02x %02x %02x %02x %02x %02x %02x\n",
-	       hdcp_sec[0x18], hdcp_sec[0x19], hdcp_sec[0x1a], hdcp_sec[0x1b],
-	       hdcp_sec[0x1c], hdcp_sec[0x1d], hdcp_sec[0x1e], hdcp_sec[0x1f]);
+	pdata.buf_size = pdata.buf_max_size;
 	return 0;
 }
 
@@ -510,5 +418,59 @@ int read_hdcp_ri(int adapter_fd, double ri_time)
 		fflush(stdout);
 		usleep(ri_time * 1000000);
 	}
+	return 0;
+}
+
+static int read_scdc_registers(int adapter_fd, __u8 *scdc, bool update_only)
+{
+	struct i2c_rdwr_ioctl_data data;
+	struct i2c_msg write_message;
+	struct i2c_msg read_message;
+	__u8 offset = update_only ? 0x10 : 0;
+	int err;
+
+	write_message = {
+		.addr = SCDC_ADDR,
+		.len = 1,
+		.buf = &offset
+	};
+	read_message = {
+		.addr = SCDC_ADDR,
+		.flags = I2C_M_RD,
+		.len = (__u16)(update_only ? 2 : 128),
+		.buf = scdc
+	};
+
+	struct i2c_msg msgs[2] = { write_message, read_message };
+
+	data.msgs = msgs + update_only;
+	data.nmsgs = ARRAY_SIZE(msgs) - update_only;
+	err = ioctl(adapter_fd, I2C_RDWR, &data);
+
+	if (err < 0) {
+		fprintf(stderr, "Unable to read SCDC %02x-%02x: %s\n",
+			offset, offset + read_message.len - 1, strerror(errno));
+		return -1;
+	}
+	if (update_only)
+		return 0;
+	offset = 128;
+	data.msgs[1].buf = scdc + 128;
+	err = ioctl(adapter_fd, I2C_RDWR, &data);
+
+	if (err < 0) {
+		fprintf(stderr, "Unable to read SCDC %02x-%02x: %s\n",
+			offset, offset + read_message.len - 1, strerror(errno));
+		return -1;
+	}
+	return 0;
+}
+
+int read_scdc(int adapter_fd, parse_data &pdata, bool update_only)
+{
+	if (read_scdc_registers(adapter_fd, pdata.buf, update_only))
+		return -1;
+
+	pdata.buf_size = update_only ? 2 : 256;
 	return 0;
 }

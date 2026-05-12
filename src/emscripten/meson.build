@@ -64,6 +64,8 @@ edid_decode_sources = [
 	'../parse-ls-ext-block.cpp',
 	'../parse-vtb-ext-block.cpp',
 	'../parse-if.cpp',
+	'../parse-hdcp.cpp',
+	'../parse-scdc.cpp',
 ]
 
 edid_decode = executable(

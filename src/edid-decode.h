@@ -140,6 +140,13 @@ struct cta_vfd {
 	unsigned int fr48:1;
 };
 
+struct parse_data {
+	const char *name;
+	unsigned char *buf;
+	const unsigned buf_max_size;
+	unsigned buf_size;
+};
+
 struct edid_state {
 	edid_state()
 	{
@@ -543,7 +550,7 @@ struct edid_state {
 	void print_native_res();
 	int parse_edid();
 
-	int parse_if(const std::string &fname);
+	int parse_if_file(const std::string &fname);
 	int parse_if_hdr(const unsigned char *x, unsigned size, unsigned char mask = 0xff);
 	void parse_if_hdmi(const unsigned char *x, unsigned len);
 	void parse_if_hdmi_forum(const unsigned char *x, unsigned len);
@@ -555,8 +562,14 @@ struct edid_state {
 	void parse_if_ntsc_vbi(const unsigned char *x, unsigned size);
 	void parse_if_drm(const unsigned char *x, unsigned size);
 
-	int parse_eld(const std::string &fname);
+	int parse_eld_file(const std::string &fname);
 	void parse_eld_baseline(const unsigned char *x, unsigned size);
+
+	int parse_scdc_pdata(parse_data &pdata);
+	void parse_scdc(const unsigned char *scdc, unsigned size);
+
+	int parse_hdcp_pdata(parse_data &pdata);
+	void parse_hdcp(const unsigned char *hdcp, unsigned size);
 };
 
 static inline void add_str(std::string &s, const std::string &add)
@@ -645,8 +658,9 @@ char *extract_string(const unsigned char *x, unsigned len, bool is_cp437);
 int request_i2c_adapter(const char *device);
 int read_edid(int adapter_fd, unsigned char *edid, bool silent = false);
 int test_reliability(int adapter_fd, unsigned secs, unsigned msleep);
-int read_hdcp(int adapter_fd);
+int read_hdcp(int adapter_fd, parse_data &pdata);
 int read_hdcp_ri(int adapter_fd, double ri_time);
+int read_scdc(int adapter_fd, parse_data &pdata, bool update_only);
 
 #else
 
@@ -654,6 +668,7 @@ static inline int read_edid(int adapter_fd, unsigned char *edid) { return -ENODE
 static inline int test_reliability(int adapter_fd, unsigned secs, unsigned msleep) { return -ENODEV; }
 static inline int read_hdcp(int adapter_fd) { return -ENODEV; }
 static inline int read_hdcp_ri(int adapter_fd, double ri_time) { return -ENODEV; }
+static inline int read_scdc(int adapter_fd, parse_data &pdata, bool update_only) { return -ENODEV; }
 
 #endif
 

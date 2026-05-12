@@ -131,7 +131,7 @@ DDDB: VESA Display Device Data Block (DDDB) Standard, Version 1
 .TP
 HDMI 1.4b: High-Definition Multimedia Interface, Version 1.4b
 .TP
-HDMI 2.1b: High-Definition Multimedia Interface, Version 2.1b
+HDMI 2.2: High-Definition Multimedia Interface, Version 2.2
 .TP
 HDCP 1.4: High-bandwidth Digital Content Protection System, Revision 1.4
 .TP
@@ -239,6 +239,12 @@ On Linux systems ELD can be extracted via the amixer command (copy all hex after
     0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00
 
 .TP
+\fB\-D\fR, \fB\-\-scdc\fR \fI<file>\fR
+Parse the given SCDC file. Read data from stdin if '-' was passed as argument.
+.TP
+\fB\-J\fR, \fB\-\-hdcp\fR \fI<file>\fR
+Parse the given HDCP file. Read data from stdin if '-' was passed as argument.
+.TP
 \fB\-\-diagonal\fR \fI<inches>\fR
 Specify the diagonal of the display in inches. This will enable additional checks
 for the image size, checking if it corresponds to the diagonal. This assumes
@@ -337,6 +343,12 @@ Read and parse the HDCP data from the i2c adapter.
 .TP
 \fB\-\-i2c\-hdcp-ri\fR \fI<t>\fR
 Every \fI<t>\fR seconds read and report the HDCP Ri value from the i2c adapter.
+.TP
+\fB\-\-i2c\-scdc\fR
+Read and parse the SCDC data from the i2c adapter.
+.TP
+\fB\-\-i2c\-scdc\-update\fR
+Read and parse the SCDC Update Flags from the i2c adapter.
 .TP
 \fB\-\-i2c\-test\-reliability\fR [\fBduration\fR=\fI<secs>\fR][,\fBsleep\fR=\fI<msecs>\fR]
 Read the EDID continuously for \fI<secs>\fR seconds (default is 0, meaning forever),

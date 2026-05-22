@@ -781,10 +781,18 @@ bool edid_state::print_timings(const char *prefix, const struct timings *t,
 			     t->hsize_mm, t->vsize_mm);
 		} else if (t->hratio && t->vratio) {
 			unsigned vsize = (t->hsize_mm * t->vratio) / t->hratio;
+			unsigned hsize = (t->vsize_mm * t->hratio) / t->vratio;
 
-			if (vsize < t->vsize_mm - 10 || vsize > t->vsize_mm + 10)
-				warn("Image size is %dx%d mm, but based on the picture AR it should be %dx%d mm.\n",
-				     t->hsize_mm, t->vsize_mm, t->hsize_mm, vsize);
+			if (vsize > t->vsize_mm + 10 && hsize < t->hsize_mm + 10) {
+
+				if (hsize < t->hsize_mm - 10 || hsize > t->hsize_mm + 10)
+					warn("Image size is %dx%d mm, but based on the picture AR it should be %dx%d mm.\n",
+					     t->hsize_mm, t->vsize_mm, hsize, t->vsize_mm);
+			} else {
+				if (vsize < t->vsize_mm - 10 || vsize > t->vsize_mm + 10)
+					warn("Image size is %dx%d mm, but based on the picture AR it should be %dx%d mm.\n",
+					     t->hsize_mm, t->vsize_mm, t->hsize_mm, vsize);
+			}
 		}
 	}
 	return ok;
@@ -1515,8 +1523,15 @@ void edid_state::print_native_res()
 				warn("No image size was specified, but it is calculated as %.1fx%.1fmm.\n",
 				     w / 10.0, h / 10.0);
 			}
+			/*
+			 * The Base Block is limited to values <= 255 cm. For displays that are
+			 * larger, use the NVRDB to correctly report the size. It is possible to
+			 * use the HDMI VSDB as well (Image_Size bit), but that's not generally
+			 * used and it also forces the dimensions to a multiple of 5 cm, which is
+			 * quite crude.
+			 */
 			if (has_cta && !cta.nvrdb_has_size && (w > 25500 || h > 25500))
-				warn("Calculated image width or height > 255 cm, recommend including an NVRDB with image size.\n");
+				fail("Calculated image width or height > 255 cm, but there is no NVRDB with image size.\n");
 		}
 	}
 

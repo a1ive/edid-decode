@@ -172,13 +172,6 @@ void edid_state::parse_displayid_parameters(const unsigned char *x)
 	if (dispid.has_display_parameters)
 		fail("Duplicate Display Parameters Data Block.\n");
 	dispid.has_display_parameters = true;
-	dispid.image_width = (x[4] << 8) + x[3];
-	dispid.image_height = (x[6] << 8) + x[5];
-	if (dispid.image_width > image_width ||
-	    dispid.image_height > image_height) {
-		image_width = dispid.image_width;
-		image_height = dispid.image_height;
-	}
 	printf("    Image size: %.1f mm x %.1f mm\n",
 	       dispid.image_width / 10.0, dispid.image_height / 10.0);
 	unsigned w = (x[8] << 8) + x[7];
@@ -1208,23 +1201,12 @@ void edid_state::parse_displayid_parameters_v2(const unsigned char *x,
 		fail("Duplicate Display Parameters Data Block.\n");
 	dispid.has_display_parameters = true;
 
-	unsigned hor_size = (x[4] << 8) + x[3];
-	unsigned vert_size = (x[6] << 8) + x[5];
-
-	dispid.image_width = hor_size;
-	dispid.image_height = vert_size;
 	if (x[1] & 0x80) {
-		printf("    Image size: %u mm x %u mm\n", hor_size, vert_size);
-		dispid.image_width *= 10;
-		dispid.image_height *= 10;
+		printf("    Image size: %u mm x %u mm\n",
+		       dispid.image_width / 10, dispid.image_height / 10);
 	} else {
 		printf("    Image size: %.1f mm x %.1f mm\n",
-		       hor_size / 10.0, vert_size / 10.0);
-	}
-	if (dispid.image_width > image_width ||
-	    dispid.image_height > image_height) {
-		image_width = dispid.image_width;
-		image_height = dispid.image_height;
+		       dispid.image_width / 10.0, dispid.image_height / 10.0);
 	}
 
 	unsigned w = (x[8] << 8) + x[7];
@@ -2394,6 +2376,24 @@ void edid_state::preparse_displayid_block(unsigned char *x)
 				update_checksum = true;
 			}
 			break;
+		case 0x01:
+		case 0x21: {
+			unsigned hor_size = (x[offset + 4] << 8) + x[offset + 3];
+			unsigned vert_size = (x[offset + 6] << 8) + x[offset + 5];
+
+			if (tag == 0x21 && (x[offset + 1] & 0x80)) {
+				hor_size *= 10;
+				vert_size *= 10;
+			}
+			dispid.image_width = hor_size;
+			dispid.image_height = vert_size;
+			if (dispid.image_width > image_width ||
+			    dispid.image_height > image_height) {
+				image_width = dispid.image_width;
+				image_height = dispid.image_height;
+			}
+			break;
+		}
 		case 0x12:
 		case 0x28:
 			if (replace_unique_ids &&

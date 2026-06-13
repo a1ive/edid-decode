@@ -1495,7 +1495,7 @@ void edid_state::print_native_res()
 			double d = sqrt(w * w + h * h) / 254.0;
 
 			if (fabs(diagonal - d) >= 0.1) {
-				warn("Specified diagonal is %.1f\", calculated diagonal is %.1f\" for EDID image size %.1fx%.1fmm.\n",
+				msg(fabs(diagonal - d) < 1.0, "Specified diagonal is %.1f\", calculated diagonal is %.1f\" for EDID image size %.1fx%.1fmm.\n",
 				     diagonal, d, w / 10.0, h / 10.0);
 			}
 		}

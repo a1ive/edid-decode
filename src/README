@@ -31,7 +31,7 @@ EDID features.
 I host a simple website where you can paste an EDID and get the full
 edid-decode output here:
 
-https://hverkuil.home.xs4all.nl/edid-decode/edid-decode.html
+https://hverkuil.mijnweb.site/edid-decode/edid-decode.html
 
 This is updated regularly with the latest edid-decode. It uses emscripten
 and the html file is maintained in the emscripten directory of edid-decode.

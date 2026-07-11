@@ -2387,6 +2387,8 @@ void edid_state::preparse_displayid_block(unsigned char *x)
 			}
 			dispid.image_width = hor_size;
 			dispid.image_height = vert_size;
+			if (hor_size && vert_size)
+				has_valid_image_size = true;
 			if (dispid.image_width > image_width ||
 			    dispid.image_height > image_height) {
 				image_width = dispid.image_width;

@@ -3085,6 +3085,7 @@ void edid_state::preparse_cta_block(unsigned char *x)
 				}
 				cta.image_width = w;
 				cta.image_height = h;
+				has_valid_image_size = true;
 				if (cta.image_width > image_width ||
 				    cta.image_height > image_height) {
 					image_width = cta.image_width;

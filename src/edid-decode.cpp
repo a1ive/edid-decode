@@ -764,8 +764,10 @@ bool edid_state::print_timings(const char *prefix, const struct timings *t,
 		/* this is valid */
 	} else if (!t->hsize_mm && !t->vsize_mm) {
 		/* this is valid */
-	} else if (cta.preparsed_image_size == hdmi_image_size_ratio) {
-		/* this is valid */
+	} else if (cta.preparsed_image_size == hdmi_image_size_ratio &&
+		   (!has_valid_image_size || image_width > 40950 || image_height > 40950)) {
+		if (has_valid_image_size && t->hsize_mm != 4095 && t->vsize_mm != 4095)
+			warn("For displays > 4095 mm the image size is expected to be set to 4095 mm.\n");
 	} else if (t->hsize_mm > image_width / 10.0 + 9 ||
 		   t->vsize_mm > image_height / 10.0 + 9) {
 		fail("Mismatch of image size %ux%u mm vs display size %ux%u mm.\n",

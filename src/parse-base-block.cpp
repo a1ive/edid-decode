@@ -1657,6 +1657,8 @@ void edid_state::parse_base_block(const unsigned char *x)
 			image_width = base.max_display_width_mm * 10;
 			image_height = base.max_display_height_mm * 10;
 		}
+		if (cta.preparsed_image_size >= hdmi_image_size_rounded)
+			has_valid_image_size = true;
 		if (x[0x15] < 10 || x[0x16] < 10)
 			warn("Dubious maximum image size (%ux%u is smaller than %ux%u cm).\n",
 			     x[0x15] * factor, x[0x16] * factor,
@@ -1670,6 +1672,10 @@ void edid_state::parse_base_block(const unsigned char *x)
 	} else {
 		/* Either or both can be zero for 1.3 and before */
 		printf("    Image size is variable\n");
+		if (cta.preparsed_image_size)
+			fail("Image size is variable, but the HDMI VSDB indicates a fixed image size.\n");
+		else if (has_valid_image_size)
+			fail("Image size is variable, but a fixed Image Size is reported in CTA or DisplayID blocks.\n");
 	}
 
 	if (x[0x17] == 0xff)

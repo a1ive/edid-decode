@@ -159,6 +159,7 @@ struct edid_state {
 		dtd_max_vsize_mm = dtd_max_hsize_mm = 0;
 		warnings = failures = 0;
 		has_cta = has_dispid = false;
+		has_valid_image_size = false;
 		// Note: for now we do not support native DisplayID data,
 		// so this is always false. But some tests are different
 		// depending on whether it is a native DisplayID structure
@@ -258,6 +259,10 @@ struct edid_state {
 	unsigned unused_bytes;
 	bool has_cta;
 	bool has_dispid;
+
+	// true if CTA has NVRDB with image size, or DisplayID has
+	// Display Parameters with non-0 Image Size values.
+	bool has_valid_image_size;
 	bool native_dispid;
 	bool hide_serial_numbers;
 	bool replace_unique_ids;

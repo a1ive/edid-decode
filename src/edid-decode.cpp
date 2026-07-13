@@ -23,6 +23,9 @@
 
 static edid_state state;
 
+static const unsigned char edid_hdr[8] = {
+	0, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0
+};
 static unsigned char edid[EDID_PAGE_SIZE * EDID_MAX_BLOCKS];
 static bool odd_hex_digits;
 
@@ -1226,7 +1229,7 @@ static int edid_from_file(const char *from_file, FILE *error)
 	if (fd != 0)
 		close(fd);
 
-	if (memcmp(edid, "\x00\xFF\xFF\xFF\xFF\xFF\xFF\x00", 8)) {
+	if (memcmp(edid, edid_hdr, sizeof(edid_hdr))) {
 		if (!options[OptPhysicalAddress])
 			fprintf(error, "No EDID header found in '%s'.\n", from_file);
 		return -1;
@@ -1610,8 +1613,14 @@ int edid_state::parse_edid()
 	if (replace_unique_ids)
 		replace_checksum(edid, EDID_PAGE_SIZE);
 
-	for (unsigned i = 1; i < num_blocks; i++)
+	unsigned edid_num_blocks = num_blocks;
+	for (unsigned i = 1; i < num_blocks; i++) {
+		if (!memcmp(edid + i * EDID_PAGE_SIZE, edid_hdr, sizeof(edid_hdr))) {
+			num_blocks = i;
+			break;
+		}
 		preparse_extension(edid + i * EDID_PAGE_SIZE);
+	}
 
 	if (options[OptPhysicalAddress]) {
 		printf("%x.%x.%x.%x\n",
@@ -1624,9 +1633,9 @@ int edid_state::parse_edid()
 
 	if (!options[OptSkipHexDump]) {
 		printf("edid-decode (hex):\n\n");
-		for (unsigned i = 0; i < num_blocks; i++) {
+		for (unsigned i = 0; i < edid_num_blocks; i++) {
 			hex_block("", edid + i * EDID_PAGE_SIZE, EDID_PAGE_SIZE, false);
-			if (i == num_blocks - 1 && options[OptOnlyHexDump])
+			if (i == edid_num_blocks - 1 && options[OptOnlyHexDump])
 				return 0;
 			printf("\n");
 		}
@@ -1651,6 +1660,10 @@ int edid_state::parse_edid()
 
 	block = "";
 	block_nr = EDID_MAX_BLOCKS;
+
+	if (num_blocks < edid_num_blocks)
+		fail("Extension Block %u started with EDID header, ignoring Extension Blocks >= %u.\n",
+		     num_blocks, num_blocks);
 
 	if (cta.has_svrs)
 		cta_resolve_svrs();

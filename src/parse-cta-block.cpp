@@ -3437,8 +3437,8 @@ void edid_state::check_cta_blocks()
 
 	for (vec_timings_ext::iterator iter = cta.native_timing_nvrdb.begin();
 	     iter != cta.native_timing_nvrdb.end(); ++iter) {
-			native_nvrdb_hact = iter->t.hact;
-			native_nvrdb_vact = iter->t.vact;
+		native_nvrdb_hact = iter->t.hact;
+		native_nvrdb_vact = iter->t.vact;
 	}
 
 	if (native_prog_mixed_resolutions)

@@ -1652,13 +1652,21 @@ void edid_state::parse_base_block(const unsigned char *x)
 		       factor == 5 ? " (HDMI VSDB indicates 5 cm units)" : "");
 		base.max_display_width_mm = x[0x15] * 10 * factor;
 		base.max_display_height_mm = x[0x16] * 10 * factor;
+
 		if (base.max_display_width_mm * 10 > image_width ||
 		    base.max_display_height_mm * 10 > image_height) {
 			image_width = base.max_display_width_mm * 10;
 			image_height = base.max_display_height_mm * 10;
 		}
+
 		if (cta.preparsed_image_size >= hdmi_image_size_rounded)
 			has_valid_image_size = true;
+
+		if (cta.preparsed_image_size == hdmi_image_size_ratio &&
+		    (image_width > 25500 || image_height > 25500) &&
+		    base.max_display_width_mm != 2550 && base.max_display_height_mm != 2550)
+			warn("For displays > 255 cm it is recommended to set the image width or height to 255 cm.\n");
+
 		if (x[0x15] < 10 || x[0x16] < 10)
 			warn("Dubious maximum image size (%ux%u is smaller than %ux%u cm).\n",
 			     x[0x15] * factor, x[0x16] * factor,

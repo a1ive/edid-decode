@@ -960,6 +960,9 @@ void edid_state::cta_nvrdb(const unsigned char *x, unsigned length)
 	printf("    Image Size: %.1fx%.1f mm\n", w / 10.0, h / 10.0);
 	if (w <= 25500 && h <= 25500)
 		warn("Image Size should only be used for large displays with width and/or height > 255 cm\n");
+	int base_height = base.max_display_width_mm * 10 * h / w;
+	if (abs(base_height - (int)base.max_display_height_mm * 10) > 100 && cta.preparsed_image_size == hdmi_image_size_ratio)
+		warn("Base Image Size has different ratio compared to the NVRDB Image Size.\n");
 	cta.nvrdb_has_size = true;
 }
 

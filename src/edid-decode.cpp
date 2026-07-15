@@ -1861,6 +1861,7 @@ static int data_from_file(parse_data &pdata, const char *from_file)
 			fprintf(stderr, "odd number of hexadecimal digits.\n");
 		else
 			fprintf(stderr, "unknown format.\n");
+		pdata.buf_size = 0;
 		return -1;
 	}
 	close(fd);
@@ -2101,10 +2102,9 @@ int edid_state::parse_hdcp_pdata(parse_data &pdata)
 		hex_block("", pdata.buf + 128, 128, false);
 		printf("\n");
 		// KSV FIFO
-		for (unsigned i = 0; i < (pdata.buf[0x41] & 0x7f); i++) {
+		for (unsigned i = 0; i < (pdata.buf[0x41] & 0x7f); i++)
 			hex_block("", pdata.buf + 256 + i * 5, 5, false);
-			printf("\n");
-		}
+		printf("\n");
 		// Secondary HDCP data if present
 		if (!memchk(pdata.buf + 256 + 128 * 5, 256)) {
 			hex_block("", pdata.buf + 256 + 128 * 5, 128, false);

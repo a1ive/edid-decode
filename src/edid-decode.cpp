@@ -1543,7 +1543,7 @@ void edid_state::print_native_res()
 		warn("No Native Video Resolution was defined.\n");
 		// See also section 7.2.2 in the CTA-861-I (or later) standard:
 		if (has_cta)
-			warn("  Hint: set 'Native detailed modes' to a non-0 value, or add a Native Video Resolution Data Block.\n");
+			warn("  Hint: set 'Native DTDs' to a non-0 value, or add a Native Video Resolution Data Block.\n");
 	}
 
 	if (!options[OptNativeResolution])

@@ -638,7 +638,7 @@ void edid_state::cta_svd(const unsigned char *x, unsigned n, bool for_ycbcr420)
 					else if (!cta.has_vfpdb)
 						warn("The first VIC %u has width or height >= 4096, adding a VFPDB and NVRDB is strongly recommended.\n", vic);
 				} else if (cta.first_svd_might_be_preferred) {
-					warn("For improved preferred timing interoperability, set 'Native detailed modes' to 1.\n");
+					warn("For improved preferred timing interoperability, set 'Native DTDs' to 1.\n");
 				}
 			}
 			if (first_svd) {
@@ -3208,7 +3208,7 @@ void edid_state::parse_cta_block(const unsigned char *x)
 //			if ((x[3] & 0x30) && (x[3] & 0x30) != 0x30)
 //				msg(!cta.has_hdmi, "If YCbCr support is indicated, then both 4:2:2 and 4:4:4 %s be supported.\n",
 //				    cta.has_hdmi ? "shall" : "should");
-			printf("  Native detailed modes: %u\n", x[3] & 0x0f);
+			printf("  Native DTDs: %u\n", x[3] & 0x0f);
 			if (cta.block_number == 0)
 				cta.byte3 = x[3];
 			else if (x[3] != cta.byte3)
@@ -3450,10 +3450,6 @@ void edid_state::check_cta_blocks()
 		fail("Native interlaced timings are a mix of several resolutions.\n");
 	if (native_ilace && !native_prog)
 		fail("A native interlaced timing is present, but not a native progressive timing.\n");
-	if (!native_prog_mixed_resolutions && native_prog > 1)
-		warn("Multiple native progressive timings are defined.\n");
-	if (!native_ilace_mixed_resolutions && native_ilace > 1)
-		warn("Multiple native interlaced timings are defined.\n");
 
 	if (native_nvrdb_vact &&
 	    (max_pref_prog_vact > native_nvrdb_vact ||

@@ -12,6 +12,7 @@
 #include <numeric>
 
 #include "edid-decode.h"
+#include <cstdlib>
 
 #define MinVblankDuration 460
 #define MinVblankLines 20

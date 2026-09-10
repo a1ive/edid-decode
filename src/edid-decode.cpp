@@ -17,6 +17,7 @@
 #include <unistd.h>
 
 #include "edid-decode.h"
+#include <cstdlib>
 
 #define STR(x) #x
 #define STRING(x) STR(x)

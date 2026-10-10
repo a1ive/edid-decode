@@ -76,7 +76,9 @@ enum Option {
 	OptI2CSCDCUpdate,
 	OptI2CHDCP,
 	OptI2CHDCPRi,
+	OptI2CDualMode,
 	OptI2CTestReliability,
+	OptDualMode,
 	OptSTD,
 	OptDMT,
 	OptVIC,
@@ -126,6 +128,7 @@ static struct option long_options[] = {
 	{ "i2c-scdc", no_argument, 0, OptI2CSCDC },
 	{ "i2c-hdcp", no_argument, 0, OptI2CHDCP },
 	{ "i2c-hdcp-ri", required_argument, 0, OptI2CHDCPRi },
+	{ "i2c-dualmode", no_argument, 0, OptI2CDualMode },
 	{ "i2c-test-reliability", optional_argument, 0, OptI2CTestReliability },
 #endif
 	{ "std", required_argument, 0, OptSTD },
@@ -145,6 +148,7 @@ static struct option long_options[] = {
 	{ "eld", required_argument, 0, OptEld },
 	{ "scdc", required_argument, 0, OptSCDC },
 	{ "hdcp", required_argument, 0, OptHDCP },
+	{ "dualmode", required_argument, 0, OptDualMode },
 	{ 0, 0, 0, 0 }
 };
 
@@ -194,6 +198,7 @@ static void usage(void)
 	       "  --i2c-scdc-update	Read the SCDC Update information (bytes 0x10-0x11) from the DDC lines.\n"
 	       "  --i2c-hdcp		Read the HDCP from the DDC lines.\n"
 	       "  --i2c-hdcp-ri=<t>	Read and print the HDCP Ri information every <t> seconds.\n"
+	       "  --i2c-dualmode	Read the DP Dual-Mode cable adapter data from the DDC lines.\n"
 	       "  --i2c-test-reliability [duration=<secs>][,sleep=<msecs>]\n"
 	       "                        Read the EDID continuously for <secs> seconds (default=0=forever), with a sleep\n"
 	       "                        of <msecs> milliseconds (default value is 50 ms) in between each read.\n"
@@ -248,6 +253,7 @@ static void usage(void)
 	       "                        This option can be specified multiple times for different ELD files.\n"
 	       "  -D, --scdc <file>     Parse the SCDC data from <file> (or stdin if '-' was specified).\n"
 	       "  -J, --hdcp <file>     Parse the HDCP data from <file> (or stdin if '-' was specified).\n"
+	       "  --dualmode <file>     Parse the Dual-Mode data from <file> (or stdin if '-' was specified).\n"
 	       "  -h, --help            Display this help message.\n");
 }
 #endif
@@ -1740,6 +1746,15 @@ static struct parse_data hdcp_pdata = {
 	sizeof(hdcp),
 	0
 };
+
+static unsigned char dualmode[256];
+
+static struct parse_data dualmode_pdata = {
+	"DualMode",
+	dualmode,
+	sizeof(dualmode),
+	0
+};
 #endif
 
 static bool data_add_byte(parse_data &pdata, const char *s)
@@ -2124,6 +2139,47 @@ int edid_state::parse_hdcp_pdata(parse_data &pdata)
 	}
 
 	parse_hdcp(pdata.buf, pdata.buf_size);
+
+	if (!options[OptCheck] && !options[OptCheckInline])
+		return 0;
+
+	printf("\n----------------\n");
+
+	if (!options[OptSkipSHA] && strlen(STRING(SHA))) {
+		options[OptSkipSHA] = 1;
+		printf("\n");
+		print_version();
+	}
+
+	if (options[OptCheck]) {
+		if (warnings)
+			show_data_msgs(pdata.name, true);
+		if (failures)
+			show_data_msgs(pdata.name, false);
+	}
+
+	printf("\n%s conformity: %s\n",
+	       state.data_block.empty() ? pdata.name : state.data_block.c_str(),
+	       failures ? "FAIL" : "PASS");
+	return failures ? -2 : 0;
+}
+
+int edid_state::parse_dualmode_pdata(parse_data &pdata)
+{
+	state.block_nr = 0;
+	state.data_block.clear();
+
+	if (!options[OptSkipHexDump]) {
+		printf("edid-decode %s (hex):\n\n", pdata.name);
+		hex_block("", pdata.buf, 128, false);
+		printf("\n");
+		hex_block("", pdata.buf + 128, pdata.buf_size - 128, false);
+		if (options[OptOnlyHexDump])
+			return 0;
+		printf("\n----------------\n\n");
+	}
+
+	parse_dualmode(pdata.buf, pdata.buf_size);
 
 	if (!options[OptCheck] && !options[OptCheckInline])
 		return 0;
@@ -2721,6 +2777,7 @@ int main(int argc, char **argv)
 	std::vector<std::string> if_names;
 	std::vector<std::string> eld_names;
 	std::string scdc_name;
+	std::string dualmode_name;
 	std::string hdcp_name;
 	unsigned test_rel_duration = 0;
 	unsigned test_rel_msleep = 50;
@@ -2878,6 +2935,9 @@ int main(int argc, char **argv)
 		case OptSCDC:
 			scdc_name = optarg;
 			break;
+		case OptDualMode:
+			dualmode_name = optarg;
+			break;
 		case OptHDCP:
 			hdcp_name = optarg;
 			break;
@@ -2946,6 +3006,8 @@ int main(int argc, char **argv)
 				ret = read_hdcp(adapter_fd, hdcp_pdata);
 			if (!ret && options[OptI2CHDCPRi])
 				ret = read_hdcp_ri(adapter_fd, hdcp_ri_sleep);
+			if (!ret && options[OptI2CDualMode])
+				ret = read_dualmode(adapter_fd, dualmode_pdata);
 			if (options[OptI2CTestReliability])
 				ret = test_reliability(adapter_fd, test_rel_duration, test_rel_msleep);
 		} else if ((options[OptInfoFrame] || options[OptEld] ||
@@ -3035,6 +3097,26 @@ int main(int argc, char **argv)
 			s_msgs[i][1].clear();
 		}
 		int r = state.parse_hdcp_pdata(hdcp_pdata);
+		if (r && !ret)
+			ret = r;
+	}
+
+	if (dualmode_name.length()) {
+		int r = data_from_file(dualmode_pdata, dualmode_name.c_str());
+		if (r && !ret)
+			ret = r;
+	}
+	if (dualmode_pdata.buf_size) {
+		if (show_line)
+			printf("\n================\n\n");
+		show_line = true;
+
+		state.warnings = state.failures = 0;
+		for (unsigned i = 0; i < EDID_MAX_BLOCKS + 1; i++) {
+			s_msgs[i][0].clear();
+			s_msgs[i][1].clear();
+		}
+		int r = state.parse_dualmode_pdata(dualmode_pdata);
 		if (r && !ret)
 			ret = r;
 	}

@@ -10,6 +10,7 @@ edid_decode_sources = [
 	'parse-vtb-ext-block.cpp',
 	'parse-if.cpp',
 	'parse-scdc.cpp',
+	'parse-dualmode.cpp',
 	'parse-hdcp.cpp',
 	'parse-eld.cpp',
 ]

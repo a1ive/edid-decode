@@ -48,6 +48,9 @@
 #define HDCP_PRIM_ADDR 0x3a
 #define HDCP_SEC_ADDR 0x3b
 
+// i2c address for DisplayPort Dual-Mode cable adapters
+#define DUALMODE_ADDR 0x40
+
 static struct timespec start_monotonic;
 static struct timeval start_timeofday;
 static time_t valid_until_t;
@@ -472,5 +475,57 @@ int read_scdc(int adapter_fd, parse_data &pdata, bool update_only)
 		return -1;
 
 	pdata.buf_size = update_only ? 2 : 256;
+	return 0;
+}
+
+static int read_dualmode_registers(int adapter_fd, __u8 *dualmode)
+{
+	struct i2c_rdwr_ioctl_data data;
+	struct i2c_msg write_message;
+	struct i2c_msg read_message;
+	__u8 offset = 0;
+	int err;
+
+	write_message = {
+		.addr = DUALMODE_ADDR,
+		.len = 1,
+		.buf = &offset
+	};
+	read_message = {
+		.addr = DUALMODE_ADDR,
+		.flags = I2C_M_RD,
+		.len = 128,
+		.buf = dualmode
+	};
+
+	struct i2c_msg msgs[2] = { write_message, read_message };
+
+	data.msgs = msgs;
+	data.nmsgs = ARRAY_SIZE(msgs);
+	err = ioctl(adapter_fd, I2C_RDWR, &data);
+
+	if (err < 0) {
+		fprintf(stderr, "Unable to read Dual Mode %02x-%02x: %s\n",
+			offset, offset + read_message.len - 1, strerror(errno));
+		return -1;
+	}
+	offset = 128;
+	data.msgs[1].buf = dualmode + 128;
+	err = ioctl(adapter_fd, I2C_RDWR, &data);
+
+	if (err < 0) {
+		fprintf(stderr, "Unable to read Dual Mode %02x-%02x: %s\n",
+			offset, offset + read_message.len - 1, strerror(errno));
+		return -1;
+	}
+	return 0;
+}
+
+int read_dualmode(int adapter_fd, parse_data &pdata)
+{
+	if (read_dualmode_registers(adapter_fd, pdata.buf))
+		return -1;
+
+	pdata.buf_size = 256;
 	return 0;
 }

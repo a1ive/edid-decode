@@ -161,6 +161,8 @@ CVT 1.2: VESA CVT v1.2 Errata E2
 GTF 1.1: VESA Generalized Timing Formula Standard, Version: 1.1
 .TP
 HDA 1.0a: High Definition Audio Specification, Version 1.0a
+.TP
+VESA DisplayPort Dual-Mode Standard, Version 1.1
 .RE
 
 .SH OPTIONS
@@ -244,6 +246,9 @@ Parse the given SCDC file. Read data from stdin if '-' was passed as argument.
 .TP
 \fB\-J\fR, \fB\-\-hdcp\fR \fI<file>\fR
 Parse the given HDCP file. Read data from stdin if '-' was passed as argument.
+.TP
+\fB\-\-dualmode\fR \fI<file>\fR
+Parse the given Dual Mode cable adaptor file. Read data from stdin if '-' was passed as argument.
 .TP
 \fB\-\-diagonal\fR \fI<inches>\fR
 Specify the diagonal of the display in inches. This will enable additional checks
@@ -349,6 +354,9 @@ Read and parse the SCDC data from the i2c adapter.
 .TP
 \fB\-\-i2c\-scdc\-update\fR
 Read and parse the SCDC Update Flags from the i2c adapter.
+.TP
+\fB\-\-i2c\-dualmode\fR
+Read and parse the Dual Mode cable adaptors data from the i2c adapter.
 .TP
 \fB\-\-i2c\-test\-reliability\fR [\fBduration\fR=\fI<secs>\fR][,\fBsleep\fR=\fI<msecs>\fR]
 Read the EDID continuously for \fI<secs>\fR seconds (default is 0, meaning forever),

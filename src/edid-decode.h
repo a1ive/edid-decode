@@ -575,6 +575,9 @@ struct edid_state {
 
 	int parse_hdcp_pdata(parse_data &pdata);
 	void parse_hdcp(const unsigned char *hdcp, unsigned size);
+
+	int parse_dualmode_pdata(parse_data &pdata);
+	void parse_dualmode(const unsigned char *dualmode, unsigned size);
 };
 
 static inline void add_str(std::string &s, const std::string &add)
@@ -666,14 +669,16 @@ int test_reliability(int adapter_fd, unsigned secs, unsigned msleep);
 int read_hdcp(int adapter_fd, parse_data &pdata);
 int read_hdcp_ri(int adapter_fd, double ri_time);
 int read_scdc(int adapter_fd, parse_data &pdata, bool update_only);
+int read_dualmode(int adapter_fd, parse_data &pdata);
 
 #else
 
-static inline int read_edid(int adapter_fd, unsigned char *edid) { return -ENODEV; }
+static inline int read_edid(int adapter_fd, unsigned char *edid, bool silent = false) { return -ENODEV; }
 static inline int test_reliability(int adapter_fd, unsigned secs, unsigned msleep) { return -ENODEV; }
-static inline int read_hdcp(int adapter_fd) { return -ENODEV; }
+static inline int read_hdcp(int adapter_fd, parse_data &pdata) { return -ENODEV; }
 static inline int read_hdcp_ri(int adapter_fd, double ri_time) { return -ENODEV; }
 static inline int read_scdc(int adapter_fd, parse_data &pdata, bool update_only) { return -ENODEV; }
+static inline int read_dualmode(int adapter_fd, parse_data &pdata) { return -ENODEV; }
 
 #endif
 

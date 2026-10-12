@@ -3011,7 +3011,7 @@ int main(int argc, char **argv)
 			if (options[OptI2CTestReliability])
 				ret = test_reliability(adapter_fd, test_rel_duration, test_rel_msleep);
 		} else if ((options[OptInfoFrame] || options[OptEld] ||
-			    options[OptSCDC] || options[OptHDCP]) &&
+			    options[OptSCDC] || options[OptHDCP] || options[OptDualMode]) &&
 			   !options[OptGTF]) {
 			ret = 0;
 		} else {

@@ -105,9 +105,8 @@ int request_i2c_adapter(const char *device)
 	return fd;
 }
 
-static int read_edid_block(int adapter_fd, __u8 *edid,
-			   uint8_t segment, uint8_t offset, uint8_t blocks,
-			   bool silent)
+static int read_edid_block(int adapter_fd, __u8 *edid, uint8_t segment,
+			   uint8_t offset, bool silent)
 {
 	struct i2c_rdwr_ioctl_data data;
 	struct i2c_msg write_message;
@@ -128,7 +127,7 @@ static int read_edid_block(int adapter_fd, __u8 *edid,
 	read_message = {
 		.addr = EDID_ADDR,
 		.flags = I2C_M_RD,
-		.len = (__u16)(blocks * EDID_PAGE_SIZE),
+		.len = (__u16)EDID_PAGE_SIZE,
 		.buf = edid
 	};
 
@@ -159,26 +158,28 @@ int read_edid(int adapter_fd, unsigned char *edid, bool silent)
 	unsigned n_extension_blocks;
 	int err;
 
-	err = read_edid_block(adapter_fd, edid, 0, 0, 2, silent);
+	err = read_edid_block(adapter_fd, edid, 0, 0, silent);
 	if (err)
 		return err;
 	n_extension_blocks = edid[126];
 	if (!n_extension_blocks)
 		return 1;
 
+	err = read_edid_block(adapter_fd, edid + 128, 0, 128, silent);
+	if (err)
+		return err;
+
 	// Check for HDMI Forum EDID Extension Override Data Block
-	if (n_extension_blocks >= 1 &&
-	    edid[128] == 2 &&
+	if (edid[128] == 2 &&
 	    edid[133] == 0x78 &&
 	    (edid[132] & 0xe0) == 0xe0 &&
 	    (edid[132] & 0x1f) >= 2 &&
 	    edid[134] > 1)
 		n_extension_blocks = edid[134];
 
-	for (unsigned i = 2; i <= n_extension_blocks; i += 2) {
-		err = read_edid_block(adapter_fd, edid + i * 128, i / 2, 0,
-				      (i + 1 > n_extension_blocks ? 1 : 2),
-				      silent);
+	for (unsigned i = 2; i <= n_extension_blocks; i++) {
+		err = read_edid_block(adapter_fd, edid + i * 128,
+				      i / 2, (i & 1) * 128, silent);
 		if (err)
 			return err;
 	}

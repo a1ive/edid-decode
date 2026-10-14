@@ -1,0 +1,36 @@
+edid-decode DualMode (hex):
+
+44 50 2d 48 44 4d 49 20 41 44 41 50 54 4f 52 04
+a8 00 1c f8 50 53 31 37 35 30 b0 00 00 78 0f 00
+00 00 08 00 00 00 00 00 00 00 00 00 00 00 00 00
+00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+01 01 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+
+00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+
+----------------
+
+HDMI Cable Adapter:
+  Revision: 0
+  Type 2 or above
+  OUI: 00-1C-F8 (Parade)
+  Device Identification String: 'PS1750'
+  Hardware Revision: 11.0
+  Firmware Revision: 0.0
+  Maximum TMDS Clock Rate: 300 Mbps
+  I2C Speed Capabilities: 1 Kbps, 5 Kbps, 10 Kbps, 100 Kbps
+  TMDS Output Buffers: Disabled
+  HDMI CEC Pin Control: Disabled
+  I2C Speed Status: 1 Kbps, 5 Kbps, 10 Kbps, 100 Kbps, 100 Kbps
+  Vendor-Defined Features:
+    00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 '................'

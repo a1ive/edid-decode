@@ -71,3 +71,4 @@ test/vesa-displayid-arvr.test
 
 InfoFrame examples can be found in the 'if' directory.
 ELD examples can be found in the 'eld' directory.
+A VESA DisplayPort Dual-Mode example can be found in the 'dualmode' directory.

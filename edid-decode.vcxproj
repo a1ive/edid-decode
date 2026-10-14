@@ -109,7 +109,6 @@
       <AdditionalIncludeDirectories>$(SolutionDir)src\vs\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <DisableSpecificWarnings>4244; 4018; 4267; 4996; 26451; 6385; 6001</DisableSpecificWarnings>
       <AdditionalOptions>/utf-8</AdditionalOptions>
-      <ForcedIncludeFiles>$(SolutionDir)shim.h;%(ForcedIncludeFiles)</ForcedIncludeFiles>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
     </ClCompile>
     <Link>
@@ -136,7 +135,6 @@
       <AdditionalIncludeDirectories>$(SolutionDir)src\vs\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <DisableSpecificWarnings>4244; 4018; 4267; 4996; 26451; 6385; 6001</DisableSpecificWarnings>
       <AdditionalOptions>/utf-8</AdditionalOptions>
-      <ForcedIncludeFiles>$(SolutionDir)shim.h;%(ForcedIncludeFiles)</ForcedIncludeFiles>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
     </ClCompile>
     <Link>
@@ -166,7 +164,6 @@
       <DisableSpecificWarnings>4244; 4018; 4267; 4996; 26451; 6385; 6001</DisableSpecificWarnings>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <AdditionalOptions>/utf-8</AdditionalOptions>
-      <ForcedIncludeFiles>$(SolutionDir)shim.h;%(ForcedIncludeFiles)</ForcedIncludeFiles>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -189,7 +186,6 @@
       <DisableSpecificWarnings>4244; 4018; 4267; 4996; 26451; 6385; 6001</DisableSpecificWarnings>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <AdditionalOptions>/utf-8</AdditionalOptions>
-      <ForcedIncludeFiles>$(SolutionDir)shim.h;%(ForcedIncludeFiles)</ForcedIncludeFiles>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -203,6 +199,7 @@
     <ClCompile Include="src\calc-gtf-cvt.cpp" />
     <ClCompile Include="src\calc-ovt.cpp" />
     <ClCompile Include="src\parse-eld.cpp" />
+    <ClCompile Include="src\parse-dualmode.cpp" />
     <ClCompile Include="src\parse-hdcp.cpp" />
     <ClCompile Include="src\parse-if.cpp" />
     <ClCompile Include="src\parse-scdc.cpp" />
@@ -218,7 +215,6 @@
     <ClCompile Include="winedid.c" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="shim.h" />
     <ClInclude Include="src\oui.h" />
     <ClInclude Include="src\vs\getopt.h" />
     <ClInclude Include="src\vs\unistd.h" />

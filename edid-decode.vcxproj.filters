@@ -55,6 +55,9 @@
     <ClCompile Include="winedid.c">
       <Filter>windows-unix</Filter>
     </ClCompile>
+    <ClCompile Include="src\parse-dualmode.cpp">
+      <Filter>edid-decode</Filter>
+    </ClCompile>
     <ClCompile Include="src\parse-hdcp.cpp">
       <Filter>edid-decode</Filter>
     </ClCompile>
@@ -74,9 +77,6 @@
     </ClInclude>
     <ClInclude Include="src\oui.h">
       <Filter>edid-decode</Filter>
-    </ClInclude>
-    <ClInclude Include="shim.h">
-      <Filter>windows-unix</Filter>
     </ClInclude>
     <ClInclude Include="winedid.h">
       <Filter>windows-unix</Filter>

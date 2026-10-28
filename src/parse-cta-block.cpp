@@ -2653,8 +2653,10 @@ void edid_state::cta_displayid_type_7(const unsigned char *x, unsigned length)
 {
 	check_displayid_datablock_revision(x[0], 0x00, 2);
 
-	if (length < 21U + ((x[0] & 0x70) >> 4)) {
-		fail("Empty Data Block with length %u.\n", length);
+	unsigned size = 21U + ((x[0] & 0x70) >> 4);
+
+	if (length != size) {
+		fail("Invalid Type VII data block length %u (expected %u).\n", length, size);
 		return;
 	}
 	parse_displayid_type_1_7_timing(x + 1, true, 2, true);
@@ -2670,6 +2672,12 @@ void edid_state::cta_displayid_type_8(const unsigned char *x, unsigned length)
 
 	unsigned sz = (x[0] & 0x08) ? 2 : 1;
 	unsigned type = x[0] >> 6;
+
+	if ((length - 1) % sz) {
+		fail("Type VIII timing payload length %u is not a multiple of %u.\n",
+		     length - 1, sz);
+		return;
+	}
 
 	if (type) {
 		fail("Only code type 0 is supported.\n");
@@ -2699,8 +2707,17 @@ void edid_state::cta_displayid_type_10(const unsigned char *x, unsigned length)
 	}
 
 	unsigned sz = 6U + ((x[0] & 0x70) >> 4);
+	if (sz > 8) {
+		fail("Invalid descriptor size %u.\n", sz);
+		return;
+	}
 	x++;
 	length--;
+	if (length % sz) {
+		fail("Type X timing payload length %u is not a multiple of %u.\n",
+		     length, sz);
+		return;
+	}
 	for (unsigned i = 0; i < length / sz; i++)
 		parse_displayid_type_10_timing(x + i * sz, sz, true);
 }

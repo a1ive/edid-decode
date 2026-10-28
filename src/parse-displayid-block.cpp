@@ -74,11 +74,29 @@ static bool check_displayid_datablock_length(const unsigned char *x,
 	return false;
 }
 
+static bool check_displayid_timing_length(unsigned length, unsigned size)
+{
+	if (!length || length % size) {
+		fail("DisplayID timing payload length %u is not a non-zero multiple of %u.\n",
+		     length, size);
+		return false;
+	}
+	return true;
+}
+
 // tag 0x00 and 0x20
 
 void edid_state::parse_displayid_product_id(const unsigned char *x)
 {
 	check_displayid_datablock_revision(x[1]);
+
+	if (!check_displayid_datablock_length(x, 12))
+		return;
+	if (x[14] > x[2] - 12U) {
+		fail("Product name length %u exceeds the available payload (%u).\n",
+		     x[14], x[2] - 12U);
+		return;
+	}
 
 	dispid.has_product_identification = true;
 	printf("    Product Code: %u\n", x[6] | (x[7] << 8));
@@ -97,20 +115,13 @@ void edid_state::parse_displayid_product_id(const unsigned char *x)
 		printf(", Week %u", week);
 	printf("\n");
 	if (x[14]) {
-		const unsigned char maxlen = EDID_PAGE_SIZE - 15;
-		char buf[maxlen];
-		if (x[14] >= maxlen) {
-			fail("Product ID length is more than expected (%u >= %u).\n", x[14], maxlen);
-			return;
-		}
+		char buf[EDID_PAGE_SIZE];
+
 		memcpy(buf, x + 15, x[14]);
 		buf[x[14]] = 0;
 		printf("    Product ID: %s\n", buf);
 	}
 
-	unsigned len = x[2];
-	if (len < 12)
-		fail("Product Identification payload length (%u) is less than minimum required (12 bytes).\n", len);
 	if (week != 0 && week != 0xff && (week < 1 || week > 52))
 		fail("Week of Manufacture/Model Tag (%u) is out of valid range (0, 1-52, or 0xFF).\n", week);
 	if (week == 0xff && x[13] < 0x0f)
@@ -2349,17 +2360,22 @@ void edid_state::preparse_displayid_block(unsigned char *x)
 	unsigned length = x[2];
 	unsigned offset = 5;
 
-	if (length > 121)
-		length = 121;
-
 	dispid.preparsed_displayid_blocks++;
-	while (length > 0) {
+	if (length > 121)
+		return;
+
+	while (length >= 3) {
 		unsigned tag = x[offset];
 		unsigned len = x[offset + 2];
+
+		if (length < len + 3 || (!tag && !len))
+			break;
 
 		switch (tag) {
 		case 0x00:
 		case 0x20:
+			if (len < 12)
+				break;
 			if (replace_unique_ids &&
 			    (x[offset + 0x08] || x[offset + 0x09] ||
 			     x[offset + 0x0a] || x[offset + 0x0b])) {
@@ -2378,6 +2394,9 @@ void edid_state::preparse_displayid_block(unsigned char *x)
 			break;
 		case 0x01:
 		case 0x21: {
+			if (len < 4)
+				break;
+
 			unsigned hor_size = (x[offset + 4] << 8) + x[offset + 3];
 			unsigned vert_size = (x[offset + 6] << 8) + x[offset + 5];
 
@@ -2398,6 +2417,8 @@ void edid_state::preparse_displayid_block(unsigned char *x)
 		}
 		case 0x12:
 		case 0x28:
+			if (len < 22)
+				break;
 			if (replace_unique_ids &&
 			    (x[offset + 0x15] || x[offset + 0x16] ||
 			     x[offset + 0x17] || x[offset + 0x18])) {
@@ -2410,6 +2431,8 @@ void edid_state::preparse_displayid_block(unsigned char *x)
 			}
 			break;
 		case 0x29:
+			if (len < 16)
+				break;
 			if (replace_unique_ids) {
 				update_checksum = true;
 				memset(x + offset + 3, 0, 16);
@@ -2424,15 +2447,6 @@ void edid_state::preparse_displayid_block(unsigned char *x)
 		default:
 			break;
 		}
-
-		if (length < 3)
-			break;
-
-		if (length < len + 3)
-			break;
-
-		if (!tag && !len)
-			break;
 
 		length -= len + 3;
 		offset += len + 3;
@@ -2452,6 +2466,36 @@ unsigned edid_state::displayid_block(const unsigned version, const unsigned char
 	unsigned len = (length < 3) ? 0 : x[2];
 	bool hasoui = false;
 	unsigned ouinum;
+
+	if (length < 3) {
+		// Report a problem when the remaining bytes are not 0.
+		data_block.clear(); // Probably not a Data Block so clear this.
+		if (tag || (length > 1 && x[1])) {
+			printf("  Filler:\n");
+			fail("Not enough bytes remain (%d) for a DisplayID data block and the DisplayID filler is non-0.\n", length);
+			hex_block("    ", x, length);
+		}
+		return length;
+	}
+
+	if (length < len + 3) {
+		data_block.clear(); // Probably not a Data Block so clear this.
+		printf("  Filler:\n");
+		fail("The length of this DisplayID data block (%d) exceeds the number of bytes remaining (%d).\n", len + 3, length);
+		hex_block("    ", x, length);
+		return length;
+	}
+
+	if (!tag && !len) {
+		// A Product Identification Data Block with no payload bytes is not valid - assume this is the end.
+		data_block.clear(); // Probably not a Product Identification Data Block so clear this.
+		if (!memchk(x, length)) {
+			printf("  Filler:\n");
+			fail("Non-0 filler bytes in the DisplayID block.\n");
+			hex_block("    ", x, length);
+		}
+		return length;
+	}
 
 	switch (tag) {
 	// DisplayID 1.3:
@@ -2521,36 +2565,6 @@ unsigned edid_state::displayid_block(const unsigned version, const unsigned char
 	case 0x81: data_block = "CTA-861 DisplayID Data Block"; break;
 	// 0x82 .. 0xff RESERVED
 	default:   data_block = "Unknown DisplayID Data Block (" + utohex(tag) + ", length " + std::to_string(len) + ")"; break;
-	}
-
-	if (length < 3) {
-		// Report a problem when the remaining bytes are not 0.
-		data_block.clear(); // Probably not a Data Block so clear this.
-		if (tag || (length > 1 && x[1])) {
-			printf("  Filler:\n");
-			fail("Not enough bytes remain (%d) for a DisplayID data block and the DisplayID filler is non-0.\n", length);
-			hex_block("    ", x, length);
-		}
-		return length;
-	}
-
-	if (length < len + 3) {
-		data_block.clear(); // Probably not a Data Block so clear this.
-		printf("  Filler:\n");
-		fail("The length of this DisplayID data block (%d) exceeds the number of bytes remaining (%d).\n", len + 3, length);
-		hex_block("    ", x, length);
-		return length;
-	}
-
-	if (!tag && !len) {
-		// A Product Identification Data Block with no payload bytes is not valid - assume this is the end.
-		data_block.clear(); // Probably not a Product Identification Data Block so clear this.
-		if (!memchk(x, length)) {
-			printf("  Filler:\n");
-			fail("Non-0 filler bytes in the DisplayID block.\n");
-			hex_block("    ", x, length);
-		}
-		return length;
 	}
 
 	if (dooutputname && data_block.length()) {
@@ -2646,17 +2660,28 @@ unsigned edid_state::displayid_block(const unsigned version, const unsigned char
 		   else
 			   check_displayid_datablock_revision(x[1]);
 		   sz += (x[1] & 0x70) >> 4;
+		   if (!check_displayid_timing_length(len, sz))
+			   break;
 		   if (block_rev >= 1 && (x[1] & 0x08))
 			   printf("    These timings support DSC pass-through\n");
 		   for (i = 0; i < len / sz; i++)
 			   parse_displayid_type_1_7_timing(&x[3 + i * sz], true, block_rev);
 		   break;
 	}
-	case 0x23:
+	case 0x23: {
+		   unsigned size = (x[1] & 0x08) ? 2 : 1;
+
+		   if (!check_displayid_timing_length(len, size))
+			   break;
+
 		   if (block_rev)
 			   check_displayid_datablock_revision(x[1], 0xe8, 1);
 		   else
 			   check_displayid_datablock_revision(x[1], 0xc8);
+		   if (block_rev >= 1 && (x[1] & 0x20)) {
+			   printf("    Also supports YCbCr 4:2:0\n");
+			   dispid.has_ycbcr_420 = true;
+		   }
 		   if (x[1] & 0x08) {
 			   for (i = 0; i < len / 2; i++)
 				   parse_displayid_type_4_8_timing((x[1] & 0xc0) >> 6,
@@ -2668,8 +2693,11 @@ unsigned edid_state::displayid_block(const unsigned version, const unsigned char
 								   x[3 + i]);
 		   }
 		   break;
+	}
 	case 0x24:
 		   check_displayid_datablock_revision(x[1]);
+		   if (!check_displayid_timing_length(len, 6))
+			   break;
 		   for (i = 0; i < len / 6; i++)
 			   parse_displayid_type_9_timing(&x[3 + i * 6]);
 		   break;
@@ -2682,8 +2710,12 @@ unsigned edid_state::displayid_block(const unsigned version, const unsigned char
 		   unsigned sz = 6 + ((x[1] & 0x70) >> 4);
 
 		   check_displayid_datablock_revision(x[1], 0x70);
-		   if (sz > 8)
+		   if (sz > 8) {
 			   fail("Invalid descriptor size %u.\n", sz);
+			   break;
+		   }
+		   if (!check_displayid_timing_length(len, sz))
+			   break;
 
 		   for (i = 0; i < len / sz; i++)
 			   parse_displayid_type_10_timing(&x[3 + i * sz], sz);
@@ -2758,7 +2790,7 @@ void edid_state::parse_displayid_block(const unsigned char *x)
 	 * (excluding DisplayID-in-EDID magic byte)
 	 */
 	data_block.clear();
-	do_checksum("  ", x + 1, saved_length + 5, x[2] + 4);
+	do_checksum("  ", x + 1, saved_length + 5, saved_length + 4);
 
 	unused_bytes = 0x7f - (1 + saved_length + 5);
 	if (!memchk(x + 1 + saved_length + 5, unused_bytes)) {
